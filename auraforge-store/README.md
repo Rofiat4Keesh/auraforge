@@ -391,6 +391,14 @@ A product only counts as a match when it has the same name, or the same model nu
 
 **Other options:** `--refresh` downloads again the photos this script saved before, `--delay 1000` waits 1 second between downloads (default 0.5 s), and `--feed other.json` reads a different feed file.
 
+### 8.1b Your own product list and images
+
+`src/data/photo-catalog.json` holds the products typed in from your photos: name, price (6% markup included), description, shop department and image. The shop loads this list **together with** `src/data/products.json`.
+
+- **Images** live in `public/images/products/<department>/<product-name>.jpg`. A product whose image file is missing shows the neutral "IMAGE UNAVAILABLE" picture.
+- **To add or replace an image:** save a `.jpg` with exactly that file name (the `imageUrl` value in `photo-catalog.json`, with `public` in front). Then run `npm run supplier:sync`.
+- **To change a price or description:** edit the product in `photo-catalog.json`, then run `npm run supplier:sync`. You can also change it in **Admin → Products**.
+
 ### 8.2 A live supplier API
 
 All product data flows through one interface, `ProductSource`, in `src/server/suppliers/types.ts`:

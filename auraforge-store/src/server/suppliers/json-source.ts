@@ -1,6 +1,7 @@
 import { existsSync } from "fs";
 import { join } from "path";
 import catalog from "@/data/products.json";
+import photoCatalog from "@/data/photo-catalog.json";
 import imageManifest from "@/data/image-manifest.json";
 import { GENERIC_FALLBACK_IMAGE } from "@/lib/fallback-image";
 import type { NormalizedCategory, NormalizedProduct, ProductSource } from "./types";
@@ -26,6 +27,10 @@ import type { NormalizedCategory, NormalizedProduct, ProductSource } from "./typ
  * - Photos: if `npm run images:cache` saved a copy of a product's photo in public/images/products,
  *   that copy is used (served from your own website). Otherwise the supplier's photo link is used.
  *
+ * - Your own product list, src/data/photo-catalog.json (the products typed in from your photos, with their
+ *   images in public/images/products), is loaded together with products.json. Its entries carry their own
+ *   description and shop department ("storeCategory").
+ *
  * To update prices or add items: edit products.json, then run `npm run supplier:sync`
  * (or press "Sync now" in Admin → Supplier sync).
  */
@@ -43,6 +48,10 @@ export interface CatalogEntry {
   inStock: boolean;
   brand?: string;
   sourceUrl?: string;
+  /** Your own product description (used instead of the one built from the title). */
+  description?: string;
+  /** Shop department to place the product in, e.g. "Power & Backup" (overrides the automatic grouping). */
+  storeCategory?: string;
 }
 
 /**
@@ -188,6 +197,18 @@ export function categoryFor(name: string, title = ""): NormalizedCategory {
   return { slug: slugify(label) || "more-products", name: label, description: label, sortOrder: 50 };
 }
 
+/** The department named in storeCategory: one of the standard departments, or a new one with that name. */
+function storeCategoryFor(name: string): NormalizedCategory {
+  const known = DEPARTMENTS.find((d) => d.category.name.toLowerCase() === name.trim().toLowerCase());
+  if (known) return known.category;
+  const label = name.trim();
+  return { slug: slugify(label) || "more-products", name: label, description: label, sortOrder: 40 };
+}
+
+function departmentOf(entry: CatalogEntry): NormalizedCategory {
+  return entry.storeCategory?.trim() ? storeCategoryFor(entry.storeCategory) : categoryFor(entry.category, entry.title);
+}
+
 /** "hp" -> "HP", "samsung" -> "Samsung", "TP-LINK" stays "TP-LINK". */
 function titleCaseBrand(brand: string): string {
   const b = brand.trim();
@@ -281,6 +302,16 @@ function describe(entry: CatalogEntry, specs: { key: string; value: string }[]):
     .filter((s) => ["Processor", "RAM", "Storage", "Graphics", "Screen Size"].includes(s.key))
     .map((s) => `${s.key}: ${s.value}`)
     .join(" · ");
+  const own = entry.description?.trim();
+  if (own) {
+    const firstSentence = own.split(/(?<=\.)\s/)[0] ?? own;
+    return {
+      short: specLine || firstSentence,
+      long: [own, specLine ? `Key specifications — ${specLine}.` : "", "Pay securely in Naira with Paystack, with delivery across Nigeria."]
+        .filter(Boolean)
+        .join("\n\n"),
+    };
+  }
   const short = specLine || entry.title;
   const long = [
     entry.title + ".",
@@ -331,7 +362,7 @@ export function cachedImageFor(key: string, manifest: ImageManifest = imageManif
 }
 
 export function mapEntry(entry: CatalogEntry, defaultStock: number): NormalizedProduct {
-  const category = categoryFor(entry.category, entry.title);
+  const category = departmentOf(entry);
   const brand = entry.brand?.trim() ? titleCaseBrand(entry.brand) : brandFromTitle(entry.title);
   const specs = specsFromTitle(entry.title);
   const rawCategory = (entry.category || "").trim();
@@ -388,7 +419,7 @@ export class JsonCatalogSource implements ProductSource {
   private readonly entries: CatalogEntry[];
   private readonly defaultStock: number;
 
-  constructor(entries: CatalogEntry[] = catalog as CatalogEntry[]) {
+  constructor(entries: CatalogEntry[] = [...(catalog as CatalogEntry[]), ...(photoCatalog as CatalogEntry[])]) {
     this.entries = entries;
     const parsed = Number(process.env.SUPPLIER_DEFAULT_STOCK ?? "5");
     this.defaultStock = Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : 5;
@@ -397,7 +428,7 @@ export class JsonCatalogSource implements ProductSource {
   async fetchCategories(): Promise<NormalizedCategory[]> {
     const seen = new Map<string, NormalizedCategory>();
     for (const entry of this.entries) {
-      const category = categoryFor(entry.category, entry.title);
+      const category = departmentOf(entry);
       seen.set(category.slug, category);
     }
     return [...seen.values()];
