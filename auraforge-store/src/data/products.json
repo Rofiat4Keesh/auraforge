@@ -1,0 +1,122 @@
+[
+  {
+    "id": "1",
+    "title": "HP ProBook 440 G11 - Intel Core Ultra 5 125U (16GB, 512GB SSD)",
+    "category": "Laptops",
+    "originalPriceNGN": 970000,
+    "sellingPriceNGN": 1028200,
+    "formattedPrice": "₦1,028,200",
+    "imageUrl": "https://www.technocratng.com/wp-content/uploads/2024/hp-probook-440-g11.jpg",
+    "inStock": true
+  },
+  {
+    "id": "2",
+    "title": "HP EliteBook 840 G10 - AMD Ryzen 7 Pro (16GB, 512GB SSD)",
+    "category": "Laptops",
+    "originalPriceNGN": 700000,
+    "sellingPriceNGN": 742000,
+    "formattedPrice": "₦742,000",
+    "imageUrl": "https://www.technocratng.com/wp-content/uploads/2023/hp-840-g10.jpg",
+    "inStock": true
+  },
+  {
+    "id": "3",
+    "title": "HP EliteBook 845 G9 - AMD Ryzen 7 Pro (16GB, 512GB SSD)",
+    "category": "Laptops",
+    "originalPriceNGN": 580000,
+    "sellingPriceNGN": 614800,
+    "formattedPrice": "₦614,800",
+    "imageUrl": "https://www.technocratng.com/wp-content/uploads/2023/hp-845-g9.jpg",
+    "inStock": true
+  },
+  {
+    "id": "4",
+    "title": "HP EliteBook 840 G8 - 11th Gen Intel i7 (16GB, 512GB SSD)",
+    "category": "Laptops",
+    "originalPriceNGN": 500000,
+    "sellingPriceNGN": 530000,
+    "formattedPrice": "₦530,000",
+    "imageUrl": "https://www.technocratng.com/wp-content/uploads/2022/hp-840-g8.jpg",
+    "inStock": true
+  },
+  {
+    "id": "5",
+    "title": "HP EliteBook 830 G8 - 11th Gen Intel i7 (16GB, 512GB SSD)",
+    "category": "Laptops",
+    "originalPriceNGN": 500000,
+    "sellingPriceNGN": 530000,
+    "formattedPrice": "₦530,000",
+    "imageUrl": "https://www.technocratng.com/wp-content/uploads/2022/hp-830-g8.jpg",
+    "inStock": true
+  },
+  {
+    "id": "6",
+    "title": "HP EliteBook 840 G7 - 10th Gen Intel i7 (16GB, 512GB SSD)",
+    "category": "Laptops",
+    "originalPriceNGN": 450000,
+    "sellingPriceNGN": 477000,
+    "formattedPrice": "₦477,000",
+    "imageUrl": "https://www.technocratng.com/wp-content/uploads/2021/hp-840-g7.jpg",
+    "inStock": true
+  },
+  {
+    "id": "7",
+    "title": "HP EliteBook 840 G6 - 8th Gen Intel i7 (16GB, 512GB SSD)",
+    "category": "Laptops",
+    "originalPriceNGN": 390000,
+    "sellingPriceNGN": 413400,
+    "formattedPrice": "₦413,400",
+    "imageUrl": "https://www.technocratng.com/wp-content/uploads/2021/hp-840-g6.jpg",
+    "inStock": true
+  },
+  {
+    "id": "8",
+    "title": "Alienware M17 R4 Gaming Laptop (Intel i9, 32GB, RTX 3080)",
+    "category": "Laptops",
+    "originalPriceNGN": 2600000,
+    "sellingPriceNGN": 2756000,
+    "formattedPrice": "₦2,756,000",
+    "imageUrl": "https://www.technocratng.com/wp-content/uploads/2023/alienware-m17.jpg",
+    "inStock": true
+  },
+  {
+    "id": "9",
+    "title": "Samsung Galaxy S25 & S25+ Tempered Glass Screen Protector",
+    "category": "Accessories",
+    "originalPriceNGN": 15000,
+    "sellingPriceNGN": 15900,
+    "formattedPrice": "₦15,900",
+    "imageUrl": "https://www.technocratng.com/wp-content/uploads/2025/s25-tempered.jpg",
+    "inStock": true
+  },
+  {
+    "id": "10",
+    "title": "Samsung Galaxy S25 Ultra Tempered Glass Protection",
+    "category": "Accessories",
+    "originalPriceNGN": 18000,
+    "sellingPriceNGN": 19080,
+    "formattedPrice": "₦19,080",
+    "imageUrl": "https://www.technocratng.com/wp-content/uploads/2025/s25-ultra-glass.jpg",
+    "inStock": true
+  },
+  {
+    "id": "11",
+    "title": "iPad Pro 12.9 inch 6th Gen M2 Chip (128GB, Wi-Fi)",
+    "category": "Tablets",
+    "originalPriceNGN": 1450000,
+    "sellingPriceNGN": 1537000,
+    "formattedPrice": "₦1,537,000",
+    "imageUrl": "https://www.technocratng.com/wp-content/uploads/2023/ipad-pro-m2.jpg",
+    "inStock": true
+  },
+  {
+    "id": "12",
+    "title": "Samsung Galaxy S25 Ultra Replacement Display Module",
+    "category": "Spare Parts",
+    "originalPriceNGN": 220000,
+    "sellingPriceNGN": 233200,
+    "formattedPrice": "₦233,200",
+    "imageUrl": "https://www.technocratng.com/wp-content/uploads/2025/s25-screen.jpg",
+    "inStock": true
+  }
+]

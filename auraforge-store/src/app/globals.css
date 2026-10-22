@@ -1,0 +1,112 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html {
+    -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-obsidian-950 font-display text-ink-100 antialiased;
+    background-image:
+      radial-gradient(1200px 600px at 85% -10%, rgba(168, 85, 247, 0.12), transparent 60%),
+      radial-gradient(900px 500px at -10% 10%, rgba(34, 243, 255, 0.08), transparent 60%);
+    background-attachment: fixed;
+  }
+
+  ::selection {
+    background: rgba(34, 243, 255, 0.3);
+    color: #fff;
+  }
+
+  :focus-visible {
+    outline: 2px solid #22f3ff;
+    outline-offset: 2px;
+  }
+
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
+  }
+}
+
+@layer components {
+  .container-x {
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+
+  .panel {
+    @apply rounded-2xl border border-obsidian-600/70 bg-obsidian-900/80 shadow-panel backdrop-blur;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition duration-200 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply btn bg-neon-cyan text-obsidian-950 shadow-neon hover:bg-white;
+  }
+
+  .btn-ghost {
+    @apply btn border border-obsidian-600 bg-obsidian-850 text-ink-100 hover:border-neon-cyan/60 hover:text-neon-cyan;
+  }
+
+  .btn-violet {
+    @apply btn bg-neon-violet text-white shadow-neon-violet hover:brightness-110;
+  }
+
+  .icon-btn {
+    @apply relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-transparent text-ink-300 transition hover:border-obsidian-600 hover:bg-obsidian-800 hover:text-neon-cyan;
+  }
+
+  .input {
+    @apply w-full rounded-xl border border-obsidian-600 bg-obsidian-850 px-4 py-3 text-sm text-ink-100 placeholder:text-ink-500 transition focus:border-neon-cyan focus:outline-none focus:ring-2 focus:ring-neon-cyan/25;
+  }
+
+  .label {
+    @apply mb-1.5 block font-mono text-[11px] uppercase tracking-[0.18em] text-ink-400;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-obsidian-600 bg-obsidian-850 px-3 py-1.5 text-xs text-ink-300 transition hover:border-neon-cyan/50 hover:text-neon-cyan;
+  }
+
+  .chip-active {
+    @apply border-neon-cyan/70 bg-neon-cyan/10 text-neon-cyan;
+  }
+
+  .eyebrow {
+    @apply font-mono text-[11px] uppercase tracking-[0.28em] text-neon-cyan;
+  }
+
+  .neon-text {
+    @apply bg-gradient-to-r from-neon-cyan via-white to-neon-violet bg-clip-text text-transparent;
+  }
+
+  .divider {
+    @apply h-px w-full bg-gradient-to-r from-transparent via-obsidian-600 to-transparent;
+  }
+}
+
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #262c40 transparent;
+  }
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}

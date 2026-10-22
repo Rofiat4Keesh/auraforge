@@ -1,0 +1,259 @@
+// =====================================================================
+//  AURAFORGE WIDE TECHNOLOGIES LTD — Database schema (MongoDB via Prisma)
+//
+//  MONEY RULE: every money field is an Int in the MINOR unit of the base
+//  currency (kobo for NGN; 1 Naira = 100 kobo). Paystack also expects kobo,
+//  so no rounding errors can creep in between the store and the gateway.
+// =====================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------
+
+enum Role {
+  CUSTOMER
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING   // order created, waiting for payment
+  PAID      // Paystack confirmed payment
+  FAILED    // Paystack reported a failed/abandoned payment
+  CANCELLED
+  FULFILLED // shipped / delivered
+}
+
+enum TransactionStatus {
+  INITIALIZED
+  SUCCESS
+  FAILED
+  ABANDONED
+}
+
+enum TransactionSource {
+  INITIALIZE
+  VERIFY
+  WEBHOOK
+}
+
+// ---------------------------------------------------------------------
+// Embedded (composite) types — stored inside their parent document
+// ---------------------------------------------------------------------
+
+type Spec {
+  key   String // e.g. "RAM"
+  value String // e.g. "16GB"
+}
+
+type VariantAttribute {
+  name  String // e.g. "Color"
+  value String // e.g. "Obsidian Black"
+}
+
+type ProductVariant {
+  sku            String
+  label          String // human readable, e.g. "16GB / 512GB / Obsidian"
+  attributes     VariantAttribute[]
+  price          Int // kobo
+  compareAtPrice Int? // kobo, optional "was" price
+  stock          Int
+  imageIndex     Int @default(0) // which product image best shows this variant
+}
+
+type ShippingAddress {
+  fullName String
+  phone    String
+  address  String
+  city     String
+  state    String
+  notes    String?
+}
+
+type OrderItem {
+  productId    String
+  productSlug  String
+  sku          String
+  name         String
+  variantLabel String
+  image        String
+  unitPrice    Int // kobo, price snapshot at time of order
+  quantity     Int
+  lineTotal    Int // kobo
+}
+
+// ---------------------------------------------------------------------
+// Users
+// ---------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  email        String   @unique
+  passwordHash String
+  fullName     String
+  phone        String?
+  role         Role     @default(CUSTOMER)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  carts  Cart[]
+  orders Order[]
+
+  @@map("users")
+}
+
+// ---------------------------------------------------------------------
+// Catalog
+// ---------------------------------------------------------------------
+
+model Category {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  slug        String   @unique
+  name        String
+  description String
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  products Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id               String           @id @default(auto()) @map("_id") @db.ObjectId
+  slug             String           @unique
+  name             String
+  brand            String
+  shortDescription String
+  description      String
+  images           String[]
+  specs            Spec[]
+  variants         ProductVariant[]
+  tags             String[]
+
+  // Denormalised fields so the catalog can filter/sort quickly
+  minPrice   Int // kobo — lowest variant price
+  maxPrice   Int // kobo — highest variant price
+  totalStock Int
+
+  rating      Float   @default(0)
+  reviewCount Int     @default(0)
+  featured    Boolean @default(false)
+  active      Boolean @default(true)
+
+  // Reseller / supplier abstraction
+  source      String  @default("mock") // "mock" | "http" | any supplier id
+  externalId  String // id of the item in the supplier's system
+  supplierSku String?
+  costPrice   Int? // kobo — what we pay the supplier
+  lastSyncedAt DateTime?
+
+  categoryId String   @db.ObjectId
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  cartItems CartItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([source, externalId])
+  @@index([categoryId])
+  @@index([brand])
+  @@index([minPrice])
+  @@map("products")
+}
+
+// ---------------------------------------------------------------------
+// Cart
+// ---------------------------------------------------------------------
+
+model Cart {
+  id        String     @id @default(auto()) @map("_id") @db.ObjectId
+  token     String     @unique // random id stored in the "af_cart" cookie
+  userId    String?    @db.ObjectId
+  user      User?      @relation(fields: [userId], references: [id])
+  items     CartItem[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@index([userId])
+  @@map("carts")
+}
+
+model CartItem {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  cartId     String   @db.ObjectId
+  cart       Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId  String   @db.ObjectId
+  product    Product  @relation(fields: [productId], references: [id])
+  variantSku String
+  quantity   Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([cartId, variantSku])
+  @@map("cart_items")
+}
+
+// ---------------------------------------------------------------------
+// Orders & Paystack transactions
+// ---------------------------------------------------------------------
+
+model Order {
+  id          String          @id @default(auto()) @map("_id") @db.ObjectId
+  reference   String          @unique // also used as the Paystack transaction reference
+  userId      String?         @db.ObjectId
+  user        User?           @relation(fields: [userId], references: [id])
+  email       String
+  cartToken   String? // the cart this order came from — emptied once payment is confirmed
+  shipping    ShippingAddress
+  items       OrderItem[]
+  currency    String          @default("NGN")
+  subtotal    Int // kobo
+  shippingFee Int // kobo
+  total       Int // kobo
+  status      OrderStatus     @default(PENDING)
+  stockDeducted Boolean       @default(false)
+  paidAt      DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  transactions PaystackTransaction[]
+
+  @@index([userId])
+  @@index([email])
+  @@map("orders")
+}
+
+model PaystackTransaction {
+  id              String            @id @default(auto()) @map("_id") @db.ObjectId
+  reference       String            @unique
+  orderId         String            @db.ObjectId
+  order           Order             @relation(fields: [orderId], references: [id])
+  amount          Int // kobo
+  currency        String            @default("NGN")
+  status          TransactionStatus @default(INITIALIZED)
+  lastSource      TransactionSource @default(INITIALIZE)
+  accessCode      String?
+  authorizationUrl String?
+  paystackId      String? // Paystack's numeric transaction id (stored as string)
+  channel         String? // card, bank, ussd, bank_transfer...
+  gatewayResponse String?
+  customerEmail   String
+  paidAt          DateTime?
+  rawPayload      Json?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([orderId])
+  @@map("paystack_transactions")
+}
