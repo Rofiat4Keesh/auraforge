@@ -17,7 +17,18 @@ export const company = {
   country: "Nigeria",
 } as const;
 
-export const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/+$/, "");
+/**
+ * Public address of the site, e.g. "https://shop.example.ng". Some hosts (such as Coolify's
+ * SERVICE_FQDN_* variables) give only the host name, so "https://" is added when missing.
+ */
+function normaliseSiteUrl(raw: string | undefined): string {
+  const value = (raw || "").trim().split(",")[0].trim();
+  if (!value) return "http://localhost:3000";
+  const withScheme = /^https?:\/\//i.test(value) ? value : `https://${value}`;
+  return withScheme.replace(/\/+$/, "");
+}
+
+export const siteUrl = normaliseSiteUrl(process.env.NEXT_PUBLIC_SITE_URL);
 
 /** Shipping rules — configured in Naira in .env, converted to kobo here. */
 export const shippingConfig = {

@@ -1,0 +1,13 @@
+# Keep the Docker build context small and free of secrets.
+.git
+**/node_modules
+**/.next
+**/.env
+**/.env.*
+!**/.env.example
+**/npm-debug.log*
+auraforge-store/preview
+Dockerfile
+.dockerignore
+docker-compose*.yml
+docker-compose*.yaml

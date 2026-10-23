@@ -1,17 +1,19 @@
-# AuraForge store on Coolify (Docker Compose build pack).
+# AuraForge store on Coolify (Docker Compose build pack) — RECOMMENDED.
 #
-# In Coolify: New Resource -> Public/Private Repository -> durojaiyebtd/auraforge-store--1-
-#   Build Pack: Docker Compose
-#   Base Directory: /auraforge-store
-#   Docker Compose Location: /docker-compose.coolify.yml
+# Runs two services:
+#   app   -> the store (Next.js on Node.js), built from ./Dockerfile, listens on port 3000
+#   mongo -> MongoDB 7 as a single-node replica set (Prisma needs a replica set), data in a volume
 #
-# Coolify fills the SERVICE_* variables itself:
-#   SERVICE_FQDN_APP_3000      -> generates the public https domain and routes it to port 3000 of "app"
-#   SERVICE_USER_MONGO / SERVICE_PASSWORD_MONGO -> database username/password (random, stored by Coolify)
-#   SERVICE_PASSWORD_64_JWT    -> 64-character secret for signing sign-in cookies
-#   SERVICE_PASSWORD_64_MONGOKEY -> replica-set key file contents
-# Nothing secret is written in this file. Paystack keys are optional: add PAYSTACK_PUBLIC_KEY and
-# PAYSTACK_SECRET_KEY in Coolify's Environment Variables tab. Without them the store takes
+# Coolify settings: Build Pack = Docker Compose, Base Directory = /, Docker Compose Location = /docker-compose.yaml
+#
+# Coolify fills the SERVICE_* variables itself (nothing secret is written in this file):
+#   SERVICE_FQDN_APP_3000          -> public domain for "app", routed to its port 3000 (HTTPS by Coolify)
+#   SERVICE_URL_APP                -> the same domain as a full https:// URL
+#   SERVICE_USER_MONGO / SERVICE_PASSWORD_MONGO -> database username/password (random)
+#   SERVICE_PASSWORD_64_JWT        -> secret that signs sign-in cookies
+#   SERVICE_PASSWORD_64_MONGOKEY   -> replica-set key
+# Optional, in Coolify -> Environment Variables: PAYSTACK_PUBLIC_KEY, PAYSTACK_SECRET_KEY,
+# NEXT_PUBLIC_SUPPORT_EMAIL, NEXT_PUBLIC_SUPPORT_PHONE. Without Paystack keys the store takes
 # "pay later" orders that still appear in the Admin Portal.
 
 services:
@@ -20,12 +22,12 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_SITE_URL: ${SERVICE_FQDN_APP}
+        NEXT_PUBLIC_SITE_URL: ${SERVICE_URL_APP}
         NEXT_PUBLIC_SUPPORT_EMAIL: ${NEXT_PUBLIC_SUPPORT_EMAIL:-}
         NEXT_PUBLIC_SUPPORT_PHONE: ${NEXT_PUBLIC_SUPPORT_PHONE:-}
     environment:
       - SERVICE_FQDN_APP_3000
-      - NEXT_PUBLIC_SITE_URL=${SERVICE_FQDN_APP}
+      - NEXT_PUBLIC_SITE_URL=${SERVICE_URL_APP}
       - DATABASE_URL=mongodb://${SERVICE_USER_MONGO}:${SERVICE_PASSWORD_MONGO}@mongo:27017/auraforge?authSource=admin&replicaSet=rs0
       - JWT_SECRET=${SERVICE_PASSWORD_64_JWT}
       - PAYSTACK_PUBLIC_KEY=${PAYSTACK_PUBLIC_KEY:-}
