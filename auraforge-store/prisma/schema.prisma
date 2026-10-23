@@ -260,3 +260,24 @@ model PaystackTransaction {
   @@index([orderId])
   @@map("paystack_transactions")
 }
+
+// ---------------------------------------------------------------------
+// Uploaded images (product photos uploaded from the Admin Portal)
+// Stored in the database so they work on any host, including serverless
+// hosts like Vercel where files written to disk are lost. Served publicly
+// at /media/uploads/<id>.
+// ---------------------------------------------------------------------
+
+model UploadedImage {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  contentType String // image/jpeg, image/png, image/webp or image/gif
+  data        Bytes
+  size        Int // bytes
+  width       Int?
+  height      Int?
+  fileName    String // original file name, for reference only
+  uploadedBy  String   @db.ObjectId // admin user id
+  createdAt   DateTime @default(now())
+
+  @@map("uploaded_images")
+}

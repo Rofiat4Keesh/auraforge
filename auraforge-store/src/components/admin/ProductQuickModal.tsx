@@ -2,7 +2,7 @@
 
 /**
  * Pop-up for adding or editing a product without leaving the inventory table.
- * Fields: Title, Brand, Category, Price (₦), Stock, Image URL, Description and Tech specs.
+ * Fields: Title, Brand, Category, Price (₦), Stock, Photo (upload a file or paste a link), Description and Tech specs.
  * Products with several variants (e.g. colours or storage sizes) show one price/stock row per variant.
  * Anything this pop-up doesn't show (extra images, tags, compare-at prices…) is kept as it is;
  * the "Full editor" link opens the complete product editor for those.
@@ -13,6 +13,7 @@ import { Archive, ArchiveRestore, ExternalLink, Loader2, Save } from "lucide-rea
 import { ApiClientError, apiFetch } from "@/lib/api-client";
 import type { AdminCategoryRow, AdminProductDetail } from "@/types/admin";
 import { SafeImage } from "@/components/ui/SafeImage";
+import { ImageUploader } from "./ImageUploader";
 import { Modal } from "./Modal";
 
 interface VariantRow {
@@ -156,7 +157,7 @@ export function ProductQuickModal({
     if (!form.brand.trim()) next.brand = "Enter the brand, e.g. Samsung";
     if (!/^[a-f0-9]{24}$/i.test(form.categoryId)) next.categoryId = "Choose a category";
     const url = form.imageUrl.trim();
-    if (!url) next.imageUrl = "Paste an image link";
+    if (!url) next.imageUrl = "Upload a photo or paste an image link";
     else if (!(url.startsWith("/") || /^https:\/\//.test(url))) next.imageUrl = "Image must start with https:// (or /images/... for files in the project)";
     if (form.description.trim().length < 20) next.description = "Write at least 20 characters";
     for (const v of form.variants) {
@@ -355,15 +356,21 @@ export function ProductQuickModal({
           </div>
 
           <div>
-            <label htmlFor="pq-image" className="label">
-              Image URL
+            <p className="label">Product photo</p>
+            <ImageUploader
+              inputId="pq-upload"
+              label={form.imageUrl.trim() ? "Replace photo" : "Upload a photo"}
+              onUploaded={(url) => setField("imageUrl")(url)}
+            />
+            <label htmlFor="pq-image" className="mt-3 block text-xs text-ink-400">
+              …or paste an image link
             </label>
             <input
               id="pq-image"
-              className={`input ${bad("imageUrl")}`}
+              className={`input mt-1 ${bad("imageUrl")}`}
               value={form.imageUrl}
               onChange={(e) => setField("imageUrl")(e.target.value)}
-              placeholder="https://… or /images/products/…"
+              placeholder="https://… (filled in automatically when you upload)"
               inputMode="url"
             />
             {err("imageUrl")}

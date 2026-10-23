@@ -473,7 +473,7 @@ All responses use the shape `{ "success": true, "data": … }` or `{ "success": 
 | POST | `/api/auth/logout` | Sign out. |
 | GET | `/api/auth/me` | Current user or `null`. Also refreshes the sign-in cookie if the account's role changed. |
 | GET | `/api/health` | App + database status. |
-| — | `/api/admin/*` | Admin-only endpoints used by the Admin Portal (stats, orders, products, transactions, categories, customers, sync). Guarded by `src/middleware.ts` (401/403) and re-checked in the database. `PATCH /api/admin/orders/:reference` takes `{ status: "PROCESSING" \| "SHIPPED" \| "DELIVERED" \| "CANCELLED", restock? }`. `GET /api/admin/transactions` takes `status`, `q`, `from`, `to` (YYYY-MM-DD) and `page`. See section 13. |
+| — | `/api/admin/*` | Admin-only endpoints used by the Admin Portal (stats, orders, products, transactions, categories, customers, sync). Guarded by `src/middleware.ts` (401/403) and re-checked in the database. `PATCH /api/admin/orders/:reference` takes `{ status: "PROCESSING" \| "SHIPPED" \| "DELIVERED" \| "CANCELLED", restock? }`. `GET /api/admin/transactions` takes `status`, `q`, `from`, `to` (YYYY-MM-DD) and `page`. `POST /api/admin/uploads` takes `multipart/form-data` with a `file` field (JPG/PNG/WebP/GIF, max 5 MB) and returns `{ url }`; uploaded images are served publicly at `GET /media/uploads/:id`. See section 13. |
 
 Example:
 
@@ -608,7 +608,7 @@ npm run admin:create -- --email someone@yourdomain.ng --revoke
 | --- | --- |
 | **Dashboard** | Revenue cards in ₦ (total revenue, today, last 30 days with average order), **Total orders**, a **Low-stock alerts** card (5 units or fewer, with a "sold out" badge), paid orders waiting to be packed/shipped, orders awaiting payment, a 14-day sales chart (Lagos time), the low-stock list, a **Recent sales** table and the latest orders. |
 | **Orders** | Filter chips: Pending, Paid · to pack, Processing, Shipped, Delivered, Failed, Cancelled (plus "Fulfilled (older)" for orders from before these statuses existed). Search by reference, email, name or phone. **Click an order** to open a pop-up with the items, **shipping information**, the customer's **phone number** (tap to call), the **Paystack reference** (with Copy) and payment attempts, and a **status selector**: Paid → Processing → Shipped → Delivered, or Cancel (optionally putting stock back). Only valid next steps are offered, e.g. an unpaid order cannot be marked Shipped. "Full page" opens a printable packing slip. |
-| **Products** | The inventory table. **Add product** or click any product to open a pop-up with **Title, Brand, Category, Price (₦), Stock, Image URL** (with a live preview), **Description** and **Tech specs** (one `Name: value` per line). Products with several options show a price and stock box per option. **Archive** hides a product from the shop without deleting it (old orders stay correct); **Restore** brings it back. The **Advanced editor** still handles galleries, variants, tags and cost prices. |
+| **Products** | The inventory table. **Add product** or click any product to open a pop-up with **Title, Brand, Category, Price (₦), Stock, Photo** (upload a picture from your computer or phone, or paste a link, with a live preview), **Description** and **Tech specs** (one `Name: value` per line). Products with several options show a price and stock box per option. **Archive** hides a product from the shop without deleting it (old orders stay correct); **Restore** brings it back. The **Advanced editor** still handles galleries, variants, tags and cost prices. |
 | **Transactions** | Every Paystack payment attempt: date, Paystack reference and ID, customer, channel (card, bank transfer, USSD…), result (Success / Started / Failed / Abandoned), the order's status, and amount in ₦. Totals for the current filter, a date range, search, and **Download CSV** for your accountant. |
 | **Categories** | Add, rename, reorder and delete (only when empty). |
 | **Customers** | Registered accounts with paid order count, total spent, last order date; expand a row to see that customer's orders. |
@@ -621,7 +621,12 @@ npm run admin:create -- --email someone@yourdomain.ng --revoke
 - **Refunds** are made in your Paystack dashboard (Transactions → the payment → Refund). Cancelling a paid order in the admin records the cancellation and can put stock back, but it does not move money.
 - **Products are archived, not deleted**, so old orders always point at a real product.
 - **Supplier products vs your own:** products created in the admin are marked `manual` and are never changed by a supplier sync. Products that came from a feed are refreshed by the sync, which replaces edits made to them in the admin.
-- **Images:** the product pop-up stores an image link. Upload your photo to an image host (or put it in `public/images/products/`) and paste the `https://…` link (or `/images/products/your-file.jpg`).
+- **Uploading photos:** in the product pop-up click **Choose** (or drag a photo onto the box). On a phone, Choose also lets you take a picture with the camera. In the **Advanced editor** you can pick up to 10 photos at once; the first one is the main picture and the arrows change the order.
+  - Big phone photos are shrunk in your browser first (longest side 1600 px), so uploads are quick and pages stay fast on mobile data.
+  - Accepted: JPG, PNG, WebP and GIF, up to 5 MB after shrinking. The server checks the file's real contents, not just its name.
+  - Photos are saved in your MongoDB database (collection `uploaded_images`) and shown at addresses like `/media/uploads/6718f0c2…`. That works on every host, including Vercel, where files saved to disk disappear.
+  - After pulling this update, run `npx prisma db push` once so the database knows about the new collection.
+  - You can still paste a link instead (for example from your supplier), or use `/images/products/your-file.jpg` for files in the project.
 - **Legal details** (company name, RC number, address, policies) appear only in the footer, never in the header.
 
 ---

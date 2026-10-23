@@ -8,6 +8,7 @@ import { ApiClientError, apiFetch } from "@/lib/api-client";
 import type { AdminCategoryRow, AdminProductDetail } from "@/types/admin";
 import { BackLink } from "./ui";
 import { SafeImage } from "@/components/ui/SafeImage";
+import { ImageUploader } from "./ImageUploader";
 
 /**
  * Create / edit a product.
@@ -399,7 +400,7 @@ export function ProductEditor({
 
           <Section
             title="Images"
-            hint="The first image is the main picture. Paste https:// links to product photos (for example from your supplier or image host)."
+            hint="The first image is the main picture. Upload photos from your computer or phone, or paste https:// links (for example from your supplier)."
             error={errors.images}
           >
             {form.images.length === 0 ? (
@@ -459,7 +460,20 @@ export function ProductEditor({
                 ))}
               </ul>
             )}
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-4">
+              <ImageUploader
+                inputId="pe-upload"
+                multiple
+                label="Upload photos"
+                hint="Pick up to 10 at a time. JPG, PNG, WebP or GIF; big photos are resized automatically."
+                onUploaded={(url) => {
+                  setForm((f) => ({ ...f, images: [...f.images, url] }));
+                  setErrors((e) => ({ ...e, images: "" }));
+                }}
+              />
+            </div>
+            <p className="mt-3 text-xs text-ink-400">…or paste an image link:</p>
+            <div className="mt-1 flex flex-wrap gap-2">
               <input
                 id="pe-new-image"
                 className="input min-w-0 flex-1 py-2"
