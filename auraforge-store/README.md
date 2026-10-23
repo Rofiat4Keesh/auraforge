@@ -162,7 +162,7 @@ Open `.env` in VS Code and fill in:
 | `PAYSTACK_PUBLIC_KEY` / `PAYSTACK_SECRET_KEY` | Paystack Dashboard → **Settings → API Keys & Webhooks**. Use the **test** keys (`pk_test_…`, `sk_test_…`) for now. |
 | `JWT_SECRET` | A long random string. Generate one with `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"` and paste the output. |
 | `NEXT_PUBLIC_SITE_URL` | Leave as `http://localhost:3000` while developing. |
-| `NEXT_PUBLIC_BUSINESS_ADDRESS`, `NEXT_PUBLIC_SUPPORT_EMAIL`, `NEXT_PUBLIC_SUPPORT_PHONE` | Your real registered office address and contact details. They appear in the footer. |
+| `NEXT_PUBLIC_SUPPORT_EMAIL`, `NEXT_PUBLIC_SUPPORT_PHONE` | Your contact details. They appear in the footer. (`NEXT_PUBLIC_BUSINESS_ADDRESS` is optional and is not shown on the site.) |
 
 Everything else can stay at its default. Save the file.
 
@@ -527,7 +527,7 @@ auraforge-store/
 | I want to… | Edit |
 | --- | --- |
 | Change company name, tagline, RC number | `src/lib/store-config.ts` |
-| Change address / email / phone | `.env` (`NEXT_PUBLIC_…`) |
+| Change email / phone | `.env` (`NEXT_PUBLIC_…`) |
 | Change delivery fee / free-delivery threshold | `.env` (`SHIPPING_FLAT_FEE_NGN`, `FREE_SHIPPING_THRESHOLD_NGN`) |
 | Change colours and fonts | `tailwind.config.ts`, `src/app/globals.css`, `src/app/layout.tsx` |
 | Refresh the Technocrat catalog | `node scripts/import-full-catalog.js`, then `npm run supplier:sync` (section 8.1) |

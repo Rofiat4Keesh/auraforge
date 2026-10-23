@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { Mail, MapPin, Phone, ShieldCheck } from "lucide-react";
+import { Mail, Phone, ShieldCheck } from "lucide-react";
 import { company, policyPages } from "@/lib/store-config";
 import { Logo } from "./Logo";
 
 /**
- * FOOTER — the only place for legal identity, registration details, policy links and address.
+ * FOOTER — the only place for legal identity, registration details, policy links and contact details.
  */
 
 /** Shop links come from the categories that currently have products, so none lead to an empty page. */
@@ -58,10 +58,6 @@ export function Footer({ categories = [] }: { categories?: { slug: string; name:
         <div className="lg:col-span-3">
           <h2 className="eyebrow mb-4">Contact</h2>
           <address className="space-y-3 text-sm not-italic text-ink-400">
-            <p className="flex gap-2.5">
-              <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-neon-cyan" />
-              <span>{company.address}</span>
-            </p>
             <p className="flex gap-2.5">
               <Mail className="mt-0.5 h-4 w-4 shrink-0 text-neon-cyan" />
               <a href={`mailto:${company.supportEmail}`} className="hover:text-neon-cyan">
