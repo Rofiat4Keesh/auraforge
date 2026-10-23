@@ -1,0 +1,82 @@
+# AuraForge store on Coolify (Docker Compose build pack).
+#
+# In Coolify: New Resource -> Public/Private Repository -> durojaiyebtd/auraforge-store--1-
+#   Build Pack: Docker Compose
+#   Base Directory: /auraforge-store
+#   Docker Compose Location: /docker-compose.coolify.yml
+#
+# Coolify fills the SERVICE_* variables itself:
+#   SERVICE_FQDN_APP_3000      -> generates the public https domain and routes it to port 3000 of "app"
+#   SERVICE_USER_MONGO / SERVICE_PASSWORD_MONGO -> database username/password (random, stored by Coolify)
+#   SERVICE_PASSWORD_64_JWT    -> 64-character secret for signing sign-in cookies
+#   SERVICE_PASSWORD_64_MONGOKEY -> replica-set key file contents
+# Nothing secret is written in this file. Paystack keys are optional: add PAYSTACK_PUBLIC_KEY and
+# PAYSTACK_SECRET_KEY in Coolify's Environment Variables tab. Without them the store takes
+# "pay later" orders that still appear in the Admin Portal.
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_SITE_URL: ${SERVICE_FQDN_APP}
+        NEXT_PUBLIC_SUPPORT_EMAIL: ${NEXT_PUBLIC_SUPPORT_EMAIL:-}
+        NEXT_PUBLIC_SUPPORT_PHONE: ${NEXT_PUBLIC_SUPPORT_PHONE:-}
+    environment:
+      - SERVICE_FQDN_APP_3000
+      - NEXT_PUBLIC_SITE_URL=${SERVICE_FQDN_APP}
+      - DATABASE_URL=mongodb://${SERVICE_USER_MONGO}:${SERVICE_PASSWORD_MONGO}@mongo:27017/auraforge?authSource=admin&replicaSet=rs0
+      - JWT_SECRET=${SERVICE_PASSWORD_64_JWT}
+      - PAYSTACK_PUBLIC_KEY=${PAYSTACK_PUBLIC_KEY:-}
+      - PAYSTACK_SECRET_KEY=${PAYSTACK_SECRET_KEY:-}
+      - PAYSTACK_BASE_URL=https://api.paystack.co
+      - SHIPPING_FLAT_FEE_NGN=${SHIPPING_FLAT_FEE_NGN:-5000}
+      - FREE_SHIPPING_THRESHOLD_NGN=${FREE_SHIPPING_THRESHOLD_NGN:-500000}
+      - SUPPLIER_SOURCE=${SUPPLIER_SOURCE:-technocrat}
+      - SUPPLIER_DEFAULT_STOCK=${SUPPLIER_DEFAULT_STOCK:-5}
+      - COOKIE_DOMAIN=${COOKIE_DOMAIN:-}
+    depends_on:
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 120s
+      retries: 5
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:7
+    # Prisma needs MongoDB as a replica set (a single node is fine). With a root password,
+    # members must share a key file, so it is written from a Coolify-generated secret at start.
+    entrypoint:
+      - bash
+      - -c
+      - |
+        # Key files may only contain base64 characters, so use a hex digest of the secret.
+        printf '%s' "$$MONGO_REPLICA_KEY" | sha256sum | cut -c1-64 > /tmp/mongo-keyfile
+        chmod 400 /tmp/mongo-keyfile && chown 999:999 /tmp/mongo-keyfile
+        exec docker-entrypoint.sh mongod --replSet rs0 --bind_ip_all --keyFile /tmp/mongo-keyfile
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${SERVICE_USER_MONGO}
+      - MONGO_INITDB_ROOT_PASSWORD=${SERVICE_PASSWORD_MONGO}
+      - MONGO_REPLICA_KEY=${SERVICE_PASSWORD_64_MONGOKEY}
+    volumes:
+      - auraforge-mongo-data:/data/db
+    healthcheck:
+      # Also starts the replica set the first time (rs.initiate), then reports healthy.
+      test:
+        - CMD-SHELL
+        - >-
+          mongosh --quiet -u "$$MONGO_INITDB_ROOT_USERNAME" -p "$$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin
+          --eval "try { rs.status().ok } catch (e) { rs.initiate({_id:'rs0',members:[{_id:0,host:'mongo:27017'}]}).ok }"
+      interval: 10s
+      timeout: 15s
+      start_period: 30s
+      retries: 30
+    restart: unless-stopped
+
+volumes:
+  auraforge-mongo-data:

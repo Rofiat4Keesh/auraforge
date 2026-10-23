@@ -2,7 +2,7 @@
   "name": "auraforge-store",
   "version": "1.0.0",
   "private": true,
-  "description": "AURAFORGE WIDE TECHNOLOGIES LTD (RC No: 9920648) — electronics e-commerce platform with Paystack (NGN).",
+  "description": "AURAFORGE WIDE TECHNOLOGIES LTD (RC No: 9920648) \u2014 electronics e-commerce platform with Paystack (NGN).",
   "engines": {
     "node": ">=18.18.0"
   },
@@ -21,7 +21,8 @@
     "admin:create": "tsx scripts/make-admin.ts",
     "seed:admin": "tsx scripts/seed-admin.ts",
     "setup": "prisma generate && prisma db push && tsx prisma/seed.ts",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "db:seed-if-empty": "tsx scripts/seed-if-empty.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.2.0",
