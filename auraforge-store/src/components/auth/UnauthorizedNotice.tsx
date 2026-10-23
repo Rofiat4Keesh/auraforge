@@ -2,7 +2,7 @@
 
 /**
  * "Unauthorized Access" alert shown at the top of the page when the middleware turns
- * someone away from /admin (it redirects to /?unauthorized=sign-in or =forbidden).
+ * a customer account away from the Admin Portal from the shop (e.g. /account?next=/admin).
  * The query parameter is removed from the address bar straight away, so refreshing or
  * sharing the page does not show the alert again.
  */

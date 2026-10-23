@@ -600,7 +600,9 @@ npm run admin:create -- --email someone@yourdomain.ng --revoke
 
 ### 13.3 Who can open `/admin`
 
-- `src/middleware.ts` runs before every `/admin` page and `/api/admin/*` request. Anyone without an admin sign-in is sent to the home page, which shows an **Unauthorized Access** alert ("please sign in with an administrator account" or "your account doesn't have administrator permissions"). The admin API answers `401` or `403` instead.
+- The Admin Portal works as its own website at `https://<your-domain>/admin`, with its own **Staff sign-in** page (`/admin/sign-in`): no shop header, footer or cart.
+- `src/middleware.ts` runs before every `/admin` page and `/api/admin/*` request. Anyone without an admin sign-in is sent to the staff sign-in page; a signed-in customer sees **"Unauthorized Access: this account doesn't have administrator permissions"**. The admin API answers `401` or `403` instead.
+- After signing in you land on the page you asked for (for example a bookmarked `/admin/orders`). **Sign out** returns to the staff sign-in page.
 - Every admin page and API handler then checks the role again **in the database**, so removing someone's admin role works on their very next click.
 - The role can only be set by `npm run seed:admin` / `npm run admin:create`. Sign-up always creates a `CUSTOMER`, whatever the browser sends.
 
@@ -616,7 +618,7 @@ npm run admin:create -- --email someone@yourdomain.ng --revoke
 | **Customers** | Registered accounts with paid order count, total spent, last order date; expand a row to see that customer's orders. |
 | **Supplier sync** | Shows the current product source and runs a sync with one button, then reports what was added, updated, hidden or skipped. |
 
-**Sign out** in the Admin Portal takes you back to the shop's home page.
+**Sign out** in the Admin Portal takes you back to the staff sign-in page.
 
 ### 13.5 Good to know
 

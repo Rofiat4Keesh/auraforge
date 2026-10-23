@@ -3,9 +3,9 @@
  * /api/admin endpoint.
  *
  *  - Pages (/admin, /admin/*): anyone who is not signed in as an ADMIN is sent to the
- *    home page, which shows an "Unauthorized Access" alert:
- *        not signed in        -> /?unauthorized=sign-in
- *        signed in, CUSTOMER  -> /?unauthorized=forbidden
+ *    Admin Portal's own staff sign-in page, /admin/sign-in (which stays open to everyone):
+ *        not signed in        -> /admin/sign-in?next=<page they wanted>
+ *        signed in, CUSTOMER  -> /admin/sign-in?reason=forbidden  ("Unauthorized Access")
  *  - API (/api/admin/*): answers 401 (not signed in) or 403 (not an admin) as JSON.
  *
  * The middleware reads the role from the signed session cookie, so it is fast. Every
@@ -17,7 +17,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE, verifySessionToken } from "./lib/session-token";
 
 export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const { pathname, search } = request.nextUrl;
   const session = await verifySessionToken(request.cookies.get(SESSION_COOKIE)?.value);
   const isAdmin = session?.role === "ADMIN";
 
@@ -37,10 +37,17 @@ export async function middleware(request: NextRequest) {
     );
   }
 
+  if (pathname === "/admin/sign-in") {
+    const open = NextResponse.next();
+    open.headers.set("X-Robots-Tag", "noindex, nofollow");
+    return open;
+  }
+
   if (!isAdmin) {
-    const home = new URL("/", request.url);
-    home.searchParams.set("unauthorized", session ? "forbidden" : "sign-in");
-    return NextResponse.redirect(home);
+    const signIn = new URL("/admin/sign-in", request.url);
+    if (session) signIn.searchParams.set("reason", "forbidden");
+    if (pathname !== "/admin") signIn.searchParams.set("next", `${pathname}${search}`);
+    return NextResponse.redirect(signIn);
   }
 
   const response = NextResponse.next();

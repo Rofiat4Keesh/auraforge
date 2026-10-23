@@ -40,8 +40,8 @@ export function AdminShell({ adminName, adminEmail, children }: { adminName: str
 
   async function signOut() {
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
-    // Back to the shop: /admin would only redirect a signed-out visitor home anyway.
-    router.push("/");
+    // Back to the staff sign-in screen.
+    router.push("/admin/sign-in");
     router.refresh();
   }
 
