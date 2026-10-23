@@ -30,7 +30,7 @@ const EMPTY: FormState = { email: "", fullName: "", phone: "", address: "", city
  * If the session expires while the shopper is typing, the server answers 401. The sign-in step
  * reappears with everything they typed kept, and payment continues by itself after they sign in.
  */
-export function CheckoutForm({ testMode }: { testMode: boolean }) {
+export function CheckoutForm({ testMode, payOnline = true }: { testMode: boolean; payOnline?: boolean }) {
   const { cart, refreshCart } = useCart();
   const { user, checking, refreshUser } = useAuth();
   const [form, setForm] = useState<FormState>(EMPTY);
@@ -87,7 +87,8 @@ export function CheckoutForm({ testMode }: { testMode: boolean }) {
         method: "POST",
         body: JSON.stringify(values),
       });
-      // Hand over to Paystack's hosted, PCI-DSS compliant payment page.
+      // Hand over to Paystack's hosted, PCI-DSS compliant payment page
+      // (or, for a "pay later" order, straight to the order-received page).
       window.location.assign(result.authorizationUrl);
     } catch (error) {
       setSubmitting(false);
@@ -314,17 +315,23 @@ export function CheckoutForm({ testMode }: { testMode: boolean }) {
           <button type="submit" disabled={submitting || available.length === 0} className="btn-primary mt-6 w-full py-4 text-base">
             {submitting ? (
               <>
-                <Loader2 className="h-5 w-5 animate-spin" /> Connecting to Paystack…
+                <Loader2 className="h-5 w-5 animate-spin" /> {payOnline ? "Connecting to Paystack…" : "Placing your order…"}
+              </>
+            ) : payOnline ? (
+              <>
+                <Lock className="h-4 w-4" /> Pay {formatMoney(cart.total)}
               </>
             ) : (
               <>
-                <Lock className="h-4 w-4" /> Pay {formatMoney(cart.total)}
+                <Check className="h-4 w-4" /> Place order · {formatMoney(cart.total)}
               </>
             )}
           </button>
           <p className="mt-4 flex items-center justify-center gap-2 text-center text-xs text-ink-500">
             <ShieldCheck className="h-4 w-4 text-neon-lime" />
-            You&apos;ll complete payment on Paystack&apos;s secure page.
+            {payOnline
+              ? "You'll complete payment on Paystack's secure page."
+              : "Pay by bank transfer or on delivery. We'll call you to confirm."}
           </p>
         </OrderSummary>
       </form>

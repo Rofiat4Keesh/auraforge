@@ -6,7 +6,7 @@ import type { CategoryInput, ProductInput } from "@/lib/admin-validators";
 import { getProductSource } from "@/server/suppliers";
 import { syncFromSource } from "@/server/suppliers/sync";
 import { adjustStockForOrder, toOrderDTO } from "./order.service";
-import { NEXT_STATUSES, ORDER_STATUSES, REVENUE_STATUSES, STATUS_LABEL, type AdminSettableStatus } from "@/lib/order-status";
+import { ORDER_STATUSES, allowedNextStatuses, REVENUE_STATUSES, STATUS_LABEL, type AdminSettableStatus } from "@/lib/order-status";
 import type {
   AdminCategoryRow,
   AdminCustomerRow,
@@ -171,7 +171,7 @@ function toAdminOrderDetail(
   return {
     ...toOrderDTO(order, true),
     stockDeducted: order.stockDeducted,
-    allowedTransitions: NEXT_STATUSES[order.status],
+    allowedTransitions: allowedNextStatuses(order.status, order.paymentMethod),
     account: order.user ? { id: order.user.id, fullName: order.user.fullName, email: order.user.email } : null,
     transactions: order.transactions
       .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
@@ -210,7 +210,7 @@ export async function updateOrderStatus(
   const order = await prisma.order.findUnique({ where: { reference } });
   if (!order) throw new HttpError(404, "Order not found.");
 
-  if (!NEXT_STATUSES[order.status].includes(next)) {
+  if (!allowedNextStatuses(order.status, order.paymentMethod).includes(next)) {
     throw new HttpError(
       409,
       `An order that is "${STATUS_LABEL[order.status]}" cannot be changed to "${STATUS_LABEL[next]}".`,
@@ -219,9 +219,18 @@ export async function updateOrderStatus(
 
   const changed = await prisma.order.updateMany({
     where: { id: order.id, status: order.status },
-    data: { status: next },
+    data: next === "PAID" ? { status: next, paidAt: new Date() } : { status: next },
   });
   if (changed.count !== 1) throw new HttpError(409, "This order was changed by someone else. Reload and try again.");
+
+  // A "pay later" order marked Paid by an admin: take its items out of stock (once).
+  if (next === "PAID" && !order.stockDeducted) {
+    const claimed = await prisma.order.updateMany({
+      where: { id: order.id, stockDeducted: false },
+      data: { stockDeducted: true },
+    });
+    if (claimed.count === 1) await adjustStockForOrder(order, -1);
+  }
 
   if (next === "CANCELLED" && restock && order.stockDeducted) {
     const released = await prisma.order.updateMany({

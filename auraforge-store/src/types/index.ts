@@ -134,6 +134,8 @@ export interface OrderDTO {
     notes: string | null;
   } | null;
   paymentChannel: string | null;
+  /** "paystack" (paid online) or "offline" (bank transfer / pay on delivery, confirmed by an admin) */
+  paymentMethod: "paystack" | "offline";
 }
 
 export interface SessionUserDTO {

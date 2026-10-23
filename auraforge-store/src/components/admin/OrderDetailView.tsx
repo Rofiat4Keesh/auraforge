@@ -13,6 +13,7 @@ import { SafeImage } from "@/components/ui/SafeImage";
 
 /** What each status means, shown under the status selector so staff pick the right one. */
 const STATUS_HELP: Partial<Record<OrderStatusDTO, string>> = {
+  PAID: "The customer has paid you (bank transfer, POS or cash). Their items are taken out of stock.",
   PROCESSING: "You are packing the order.",
   SHIPPED: "Handed to the courier / dispatch rider.",
   DELIVERED: "The customer has received it. This is final.",
@@ -198,7 +199,9 @@ export function OrderDetailView({
             {nextStatus && STATUS_HELP[nextStatus] && <p className="mt-2 text-xs text-ink-400">{STATUS_HELP[nextStatus]}</p>}
             {order.status === "PENDING" && (
               <p className="mt-2 text-xs text-ink-400">
-                Awaiting payment: it moves to Paid by itself when Paystack confirms the payment.
+                {order.paymentMethod === "offline"
+                  ? "Pay-later order: call the customer to arrange payment, then choose “Paid · to pack” once the money arrives."
+                  : "Awaiting payment: it moves to Paid by itself when Paystack confirms the payment."}
               </p>
             )}
             {nextStatus === "CANCELLED" && (
@@ -311,7 +314,13 @@ export function OrderDetailView({
           </section>
 
           <section className="rounded-2xl border border-obsidian-700 bg-obsidian-900/70 p-5 print:hidden">
-            <h2 className="font-semibold">Payment (Paystack)</h2>
+            <h2 className="font-semibold">Payment ({order.paymentMethod === "offline" ? "pay later" : "Paystack"})</h2>
+            {order.paymentMethod === "offline" && (
+              <p className="mt-2 rounded-xl border border-neon-lime/40 bg-neon-lime/5 p-3 text-xs text-ink-300">
+                Placed while online payments were switched off (no Paystack keys). The customer pays by bank transfer or on
+                delivery. Mark the order <strong>Paid</strong> above when you receive the money.
+              </p>
+            )}
             <div className="mt-3 flex items-center justify-between gap-2 rounded-xl bg-obsidian-850 p-3 text-sm">
               <div className="min-w-0">
                 <p className="font-mono text-[10px] uppercase tracking-widest text-ink-500">Paystack reference</p>

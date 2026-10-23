@@ -17,6 +17,11 @@ function secretKey(): string {
   return key;
 }
 
+/** True when a Paystack secret key is set. Without one the store takes "pay later" orders instead. */
+export function isPaystackConfigured(): boolean {
+  return (process.env.PAYSTACK_SECRET_KEY || "").startsWith("sk_");
+}
+
 export function isTestMode(): boolean {
   const pk = process.env.PAYSTACK_PUBLIC_KEY || "";
   const sk = process.env.PAYSTACK_SECRET_KEY || "";

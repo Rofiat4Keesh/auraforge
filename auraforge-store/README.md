@@ -562,6 +562,8 @@ auraforge-store/
 3. **Delivery details** (step 2) are pre-filled from the account, then **Pay ₦…** sends the shopper to Paystack's secure page (step 3).
 4. If a sign-in expires while someone is typing their address, the server answers "Please sign in…", the sign-in step reappears with their details kept, and payment continues by itself once they sign in.
 
+**No Paystack keys yet?** The store still takes orders. The button says **Place order** instead of **Pay**, the customer sees "Order received", and the order appears in **Admin → Orders** as *Pending payment* (marked "pay later"). Call the customer, collect payment by bank transfer or on delivery, then set the order to **Paid · to pack**; that also takes the items out of stock. As soon as you add `PAYSTACK_SECRET_KEY` and `PAYSTACK_PUBLIC_KEY`, new orders are paid online through Paystack instead.
+
 The header shows **Sign In** for visitors and the shopper's first name (**Account**) once signed in. Admins also see an **Admin Portal** button in the header (and in the phone menu). Customers never see it.
 
 ### 13.2 Create your first admin: `npm run seed:admin`

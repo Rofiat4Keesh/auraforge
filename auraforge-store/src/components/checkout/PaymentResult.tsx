@@ -36,7 +36,7 @@ export function PaymentResult({ reference }: { reference: string | null }) {
       });
       attempts.current += 1;
       setState({ kind: "done", order });
-      if (isPaidStatus(order.status)) await refreshCart();
+      if (isPaidStatus(order.status) || order.paymentMethod === "offline") await refreshCart();
     } catch (error) {
       setState({
         kind: "error",
@@ -51,7 +51,7 @@ export function PaymentResult({ reference }: { reference: string | null }) {
 
   // Auto re-check pending payments (bank transfers can take a minute).
   useEffect(() => {
-    if (state.kind !== "done" || state.order.status !== "PENDING" || attempts.current >= MAX_AUTO_CHECKS) return;
+    if (state.kind !== "done" || state.order.status !== "PENDING" || state.order.paymentMethod === "offline" || attempts.current >= MAX_AUTO_CHECKS) return;
     const timer = setTimeout(() => void verify(), 5000);
     return () => clearTimeout(timer);
   }, [state, verify]);
@@ -86,7 +86,8 @@ export function PaymentResult({ reference }: { reference: string | null }) {
 
   const { order } = state;
   const paid = isPaidStatus(order.status);
-  const pending = order.status === "PENDING";
+  const offline = order.paymentMethod === "offline" && order.status === "PENDING";
+  const pending = order.status === "PENDING" && !offline;
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -97,7 +98,7 @@ export function PaymentResult({ reference }: { reference: string | null }) {
           }`}
         />
         <div className="relative">
-          {paid ? (
+          {paid || offline ? (
             <CheckCircle2 className="mx-auto h-16 w-16 text-neon-lime" />
           ) : pending ? (
             <Clock className="mx-auto h-16 w-16 text-neon-cyan" />
@@ -105,10 +106,10 @@ export function PaymentResult({ reference }: { reference: string | null }) {
             <XCircle className="mx-auto h-16 w-16 text-neon-magenta" />
           )}
           <p className="eyebrow mt-6">
-            {paid ? "Payment confirmed" : pending ? "Awaiting confirmation" : "Payment not completed"}
+            {paid ? "Payment confirmed" : offline ? "Order received" : pending ? "Awaiting confirmation" : "Payment not completed"}
           </p>
           <h1 className="mt-3 text-3xl font-bold">
-            {paid
+            {paid || offline
               ? "Thank you — your order is in!"
               : pending
                 ? "We're waiting for your bank"
@@ -117,7 +118,9 @@ export function PaymentResult({ reference }: { reference: string | null }) {
           <p className="mx-auto mt-3 max-w-md text-sm text-ink-400">
             {paid
               ? `A confirmation will be sent to ${order.email}. We'll call you before delivery.`
-              : pending
+              : offline
+                ? "We've received your order. Our team will call you shortly to arrange payment (bank transfer or on delivery) and delivery."
+                : pending
                 ? "Some payment methods take a few minutes to confirm. This page re-checks automatically."
                 : "No money was taken for this attempt. You can try again — your cart has been kept."}
           </p>

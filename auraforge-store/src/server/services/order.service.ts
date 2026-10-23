@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { HttpError } from "@/lib/http";
 import { BASE_CURRENCY } from "@/lib/money";
 import { siteUrl } from "@/lib/store-config";
-import { initializeTransaction, verifyTransaction, type PaystackTransactionData } from "@/lib/paystack";
+import { initializeTransaction, isPaystackConfigured, verifyTransaction, type PaystackTransactionData } from "@/lib/paystack";
 import type { CheckoutInput } from "@/lib/validators";
 import type { SessionPayload } from "@/lib/auth";
 import type { OrderDTO } from "@/types";
@@ -63,6 +63,7 @@ export function toOrderDTO(order: OrderWithTransactions, includePrivate: boolean
         }
       : null,
     paymentChannel: successful?.channel ?? null,
+    paymentMethod: order.paymentMethod === "offline" ? "offline" : "paystack",
   };
 }
 
@@ -143,8 +144,17 @@ export async function initializeCheckout(
       shippingFee,
       total,
       status: "PENDING",
+      paymentMethod: isPaystackConfigured() ? "paystack" : "offline",
     },
   });
+
+  // No Paystack keys yet: take the order as "pay later" (bank transfer / on delivery).
+  // It shows in Admin → Orders straight away as "Pending payment"; the admin marks it Paid
+  // when the money arrives, which also deducts the stock.
+  if (!isPaystackConfigured()) {
+    await prisma.cartItem.deleteMany({ where: { cartId: cart.id } });
+    return { reference, authorizationUrl: `/checkout/success?reference=${encodeURIComponent(reference)}`, accessCode: "" };
+  }
 
   try {
     const paystack = await initializeTransaction({
@@ -229,6 +239,13 @@ export async function confirmPayment(
 ): Promise<OrderWithTransactions> {
   const order = await prisma.order.findUnique({ where: { reference } });
   if (!order) throw new HttpError(404, "Order not found.");
+
+  // "Pay later" orders have no Paystack payment to check: return them as they are.
+  if (order.paymentMethod === "offline") {
+    const current = await prisma.order.findUnique({ where: { id: order.id }, include: { transactions: true } });
+    if (!current) throw new HttpError(404, "Order not found.");
+    return current;
+  }
 
   // Never trust only the browser: when not coming from a signed webhook, ask Paystack directly.
   const data = webhookData ?? (await verifyTransaction(reference));

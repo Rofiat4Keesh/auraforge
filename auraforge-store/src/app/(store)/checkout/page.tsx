@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { CheckoutForm } from "@/components/checkout/CheckoutForm";
-import { isTestMode } from "@/lib/paystack";
+import { isPaystackConfigured, isTestMode } from "@/lib/paystack";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +14,7 @@ export default function CheckoutPage() {
     <div className="container-x py-10">
       <p className="eyebrow">Checkout</p>
       <h1 className="mb-8 mt-2 text-3xl font-bold">Secure checkout</h1>
-      <CheckoutForm testMode={isTestMode()} />
+      <CheckoutForm testMode={isTestMode()} payOnline={isPaystackConfigured()} />
     </div>
   );
 }

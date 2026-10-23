@@ -225,6 +225,10 @@ model Order {
   shippingFee Int // kobo
   total       Int // kobo
   status      OrderStatus     @default(PENDING)
+  // "paystack" = paid online through Paystack.
+  // "offline"  = placed while Paystack keys were not set: the customer pays by bank transfer
+  //              or on delivery, and an admin marks the order Paid in the Admin Portal.
+  paymentMethod String        @default("paystack")
   stockDeducted Boolean       @default(false)
   paidAt      DateTime?
   createdAt   DateTime        @default(now())
