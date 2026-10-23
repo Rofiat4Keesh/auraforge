@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import {
+  CreditCard,
   ExternalLink,
   FolderTree,
   LayoutDashboard,
@@ -21,13 +22,14 @@ const NAV = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/orders", label: "Orders", icon: ReceiptText },
   { href: "/admin/products", label: "Products", icon: Package },
+  { href: "/admin/transactions", label: "Transactions", icon: CreditCard },
   { href: "/admin/categories", label: "Categories", icon: FolderTree },
   { href: "/admin/customers", label: "Customers", icon: Users },
   { href: "/admin/sync", label: "Supplier sync", icon: RefreshCw },
 ];
 
 /** Admin frame: sidebar on desktop, top bar + slide-in menu on phones. Separate from the shop's header/footer. */
-export function AdminShell({ adminName, children }: { adminName: string; children: ReactNode }) {
+export function AdminShell({ adminName, adminEmail, children }: { adminName: string; adminEmail: string; children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -38,7 +40,8 @@ export function AdminShell({ adminName, children }: { adminName: string; childre
 
   async function signOut() {
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
-    router.push("/admin");
+    // Back to the shop: /admin would only redirect a signed-out visitor home anyway.
+    router.push("/");
     router.refresh();
   }
 
@@ -62,10 +65,9 @@ export function AdminShell({ adminName, children }: { adminName: string; childre
       <div className="mt-auto space-y-1 border-t border-obsidian-800 pt-4">
         <Link
           href="/"
-          target="_blank"
           className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-ink-400 hover:bg-obsidian-800 hover:text-ink-100"
         >
-          <ExternalLink className="h-4 w-4" /> View store
+          <ExternalLink className="h-4 w-4" /> Back to store
         </Link>
         <button
           type="button"
@@ -74,9 +76,11 @@ export function AdminShell({ adminName, children }: { adminName: string; childre
         >
           <LogOut className="h-4 w-4" /> Sign out
         </button>
-        <p className="px-3 pt-2 font-mono text-[10px] uppercase tracking-widest text-ink-500">
-          Signed in as {adminName}
-        </p>
+        <div className="px-3 pt-2">
+          <p className="font-mono text-[10px] uppercase tracking-widest text-ink-500">Signed in as</p>
+          <p className="truncate text-xs text-ink-300">{adminName}</p>
+          <p className="truncate text-[11px] text-ink-500">{adminEmail}</p>
+        </div>
       </div>
     </nav>
   );
@@ -86,7 +90,7 @@ export function AdminShell({ adminName, children }: { adminName: string; childre
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col gap-6 border-r border-obsidian-800 bg-obsidian-950 p-4 lg:flex">
         <div className="px-1 pt-1">
           <Logo />
-          <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.3em] text-neon-violet">Admin console</p>
+          <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.3em] text-neon-violet">Admin Portal</p>
         </div>
         {nav}
       </aside>
@@ -96,7 +100,7 @@ export function AdminShell({ adminName, children }: { adminName: string; childre
           <button type="button" className="icon-btn -ml-2" onClick={() => setOpen(true)} aria-label="Open admin menu">
             <Menu className="h-5 w-5" />
           </button>
-          <span className="font-semibold">Admin</span>
+          <span className="font-semibold">Admin Portal</span>
         </header>
         <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</main>
       </div>

@@ -1,113 +1,38 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
 import { Loader2, LogOut, Package, ShieldCheck, UserRound } from "lucide-react";
-import { useCart } from "@/components/providers/CartProvider";
-import { ApiClientError, apiFetch } from "@/lib/api-client";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { AuthForm } from "@/components/auth/AuthForm";
+import { apiFetch } from "@/lib/api-client";
 import { formatMoney } from "@/lib/money";
-import type { OrderDTO, SessionUserDTO } from "@/types";
+import { STATUS_LABEL } from "@/lib/order-status";
+import { safeNextPath } from "@/lib/safe-redirect";
+import type { OrderDTO } from "@/types";
 
 const STATUS_STYLES: Record<OrderDTO["status"], string> = {
   PAID: "border-neon-lime/40 text-neon-lime",
+  PROCESSING: "border-neon-violet/50 text-neon-violet",
+  SHIPPED: "border-neon-cyan/40 text-neon-cyan",
+  DELIVERED: "border-neon-cyan/60 text-ink-100",
   FULFILLED: "border-neon-cyan/40 text-neon-cyan",
   PENDING: "border-ink-500/40 text-ink-300",
   FAILED: "border-neon-magenta/40 text-neon-magenta",
   CANCELLED: "border-ink-500/40 text-ink-500",
 };
 
-function AuthForms({ onAuthenticated }: { onAuthenticated: (user: SessionUserDTO) => void }) {
-  const [mode, setMode] = useState<"login" | "register">("login");
-  const [form, setForm] = useState({ fullName: "", email: "", phone: "", password: "" });
-  const [errors, setErrors] = useState<Record<string, string | undefined>>({});
-  const [message, setMessage] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setErrors({});
-    setMessage(null);
-    try {
-      const body = mode === "login" ? { email: form.email, password: form.password } : { ...form };
-      const user = await apiFetch<SessionUserDTO>(`/api/auth/${mode}`, { method: "POST", body: JSON.stringify(body) });
-      onAuthenticated(user);
-    } catch (error) {
-      if (error instanceof ApiClientError) {
-        setMessage(error.message);
-        setErrors(Object.fromEntries(Object.entries(error.fieldErrors).map(([k, v]) => [k, v?.[0]])));
-      } else {
-        setMessage("Something went wrong. Please try again.");
-      }
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const input = (name: keyof typeof form, label: string, type = "text", autoComplete?: string) => (
-    <div>
-      <label htmlFor={`auth-${name}`} className="label">
-        {label}
-      </label>
-      <input
-        id={`auth-${name}`}
-        type={type}
-        autoComplete={autoComplete}
-        value={form[name]}
-        onChange={(e) => setForm((f) => ({ ...f, [name]: e.target.value }))}
-        className={`input ${errors[name] ? "border-neon-magenta" : ""}`}
-        required={name !== "phone"}
-      />
-      {errors[name] && <p className="mt-1.5 text-xs text-neon-magenta">{errors[name]}</p>}
-    </div>
-  );
-
-  return (
-    <div className="panel mx-auto max-w-md p-8">
-      <div className="mb-6 grid grid-cols-2 rounded-xl border border-obsidian-700 bg-obsidian-950 p-1">
-        {(["login", "register"] as const).map((m) => (
-          <button
-            key={m}
-            type="button"
-            onClick={() => {
-              setMode(m);
-              setMessage(null);
-              setErrors({});
-            }}
-            className={`rounded-lg py-2 text-sm font-medium transition ${mode === m ? "bg-neon-cyan text-obsidian-950" : "text-ink-400 hover:text-ink-100"}`}
-          >
-            {m === "login" ? "Sign in" : "Create account"}
-          </button>
-        ))}
-      </div>
-      <form onSubmit={submit} className="space-y-4" noValidate>
-        {mode === "register" && input("fullName", "Full name", "text", "name")}
-        {input("email", "Email address", "email", "email")}
-        {mode === "register" && input("phone", "Phone (optional)", "tel", "tel")}
-        {input("password", "Password", "password", mode === "login" ? "current-password" : "new-password")}
-        {message && (
-          <p
-            className="rounded-lg border border-neon-magenta/40 bg-neon-magenta/5 p-3 text-sm text-neon-magenta"
-            role="alert"
-          >
-            {message}
-          </p>
-        )}
-        <button type="submit" disabled={busy} className="btn-primary w-full">
-          {busy && <Loader2 className="h-4 w-4 animate-spin" />}
-          {mode === "login" ? "Sign in" : "Create account"}
-        </button>
-      </form>
-      <p className="mt-6 text-center text-xs text-ink-500">
-        You can also check out as a guest — an account just keeps your order history in one place.
-      </p>
-    </div>
-  );
-}
-
+/**
+ * /account — sign in / quick sign-up when signed out; profile + order history when signed in.
+ * A `?next=/some/path` link (e.g. from the Unauthorized Access alert) sends the shopper back
+ * there after signing in. Only same-site paths are honoured.
+ */
 export function AccountView() {
-  const { refreshCart } = useCart();
-  const [user, setUser] = useState<SessionUserDTO | null | undefined>(undefined);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextPath = searchParams.get("next");
+  const { user, isAdmin, checking, signOut } = useAuth();
   const [orders, setOrders] = useState<OrderDTO[] | null>(null);
 
   const loadOrders = useCallback(async () => {
@@ -119,22 +44,11 @@ export function AccountView() {
   }, []);
 
   useEffect(() => {
-    apiFetch<SessionUserDTO | null>("/api/auth/me", { cache: "no-store" })
-      .then((u) => {
-        setUser(u);
-        if (u) void loadOrders();
-      })
-      .catch(() => setUser(null));
-  }, [loadOrders]);
+    if (user) void loadOrders();
+    else setOrders(null);
+  }, [user, loadOrders]);
 
-  async function logout() {
-    await apiFetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
-    setUser(null);
-    setOrders(null);
-    await refreshCart();
-  }
-
-  if (user === undefined) {
+  if (!user && checking) {
     return (
       <div className="flex justify-center py-20">
         <Loader2 className="h-8 w-8 animate-spin text-neon-cyan" />
@@ -144,13 +58,23 @@ export function AccountView() {
 
   if (!user) {
     return (
-      <AuthForms
-        onAuthenticated={(u) => {
-          setUser(u);
-          void loadOrders();
-          void refreshCart();
-        }}
-      />
+      <div className="panel mx-auto max-w-md p-8">
+        <AuthForm
+          idPrefix="account"
+          onSuccess={(signedIn) => {
+            const destination = safeNextPath(nextPath, "");
+            if (!destination) return; // stay here and show the order history
+            if (destination.startsWith("/admin") && signedIn.role !== "ADMIN") {
+              router.push("/?unauthorized=forbidden");
+              return;
+            }
+            router.push(destination);
+          }}
+        />
+        <p className="mt-6 text-center text-xs text-ink-500">
+          Browsing and adding to cart never need an account. You only sign in at checkout, and your cart comes with you.
+        </p>
+      </div>
     );
   }
 
@@ -161,14 +85,14 @@ export function AccountView() {
           <UserRound className="h-7 w-7 text-neon-cyan" />
         </div>
         <p className="mt-4 text-lg font-semibold">{user.fullName}</p>
-        <p className="text-sm text-ink-400">{user.email}</p>
+        <p className="break-all text-sm text-ink-400">{user.email}</p>
         {user.phone && <p className="font-mono text-xs text-ink-500">{user.phone}</p>}
-        {user.role === "ADMIN" && (
+        {isAdmin && (
           <Link href="/admin" className="btn-violet mt-6 w-full">
-            <ShieldCheck className="h-4 w-4" /> Open admin console
+            <ShieldCheck className="h-4 w-4" /> Open Admin Portal
           </Link>
         )}
-        <button type="button" onClick={logout} className="btn-ghost mt-3 w-full">
+        <button type="button" onClick={() => void signOut()} className="btn-ghost mt-3 w-full">
           <LogOut className="h-4 w-4" /> Sign out
         </button>
       </aside>
@@ -191,29 +115,18 @@ export function AccountView() {
               <li key={order.reference} className="panel p-5">
                 <div className="flex flex-wrap items-center gap-3">
                   <p className="font-mono text-sm text-neon-cyan">{order.reference}</p>
-                  <span
-                    className={`rounded-full border px-2.5 py-0.5 font-mono text-[10px] uppercase ${STATUS_STYLES[order.status]}`}
-                  >
-                    {order.status}
+                  <span className={`rounded-full border px-2.5 py-0.5 font-mono text-[10px] uppercase ${STATUS_STYLES[order.status]}`}>
+                    {STATUS_LABEL[order.status]}
                   </span>
                   <p className="ml-auto text-xs text-ink-500">
-                    {new Date(order.createdAt).toLocaleDateString("en-NG", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                    })}
+                    {new Date(order.createdAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}
                   </p>
                 </div>
-                <p className="mt-3 text-sm text-ink-300">
-                  {order.items.map((i) => `${i.name} × ${i.quantity}`).join(", ")}
-                </p>
+                <p className="mt-3 text-sm text-ink-300">{order.items.map((i) => `${i.name} × ${i.quantity}`).join(", ")}</p>
                 <div className="mt-3 flex items-center justify-between">
                   <p className="font-mono font-semibold">{formatMoney(order.total)}</p>
                   {order.status === "PENDING" && (
-                    <Link
-                      href={`/checkout/success?reference=${order.reference}`}
-                      className="text-xs text-neon-cyan hover:underline"
-                    >
+                    <Link href={`/checkout/success?reference=${order.reference}`} className="text-xs text-neon-cyan hover:underline">
                       Check payment status
                     </Link>
                   )}

@@ -19,6 +19,7 @@
     "catalog:import": "node scripts/import-full-catalog.js",
     "images:cache": "node scripts/cache-product-images.js",
     "admin:create": "tsx scripts/make-admin.ts",
+    "seed:admin": "tsx scripts/seed-admin.ts",
     "setup": "prisma generate && prisma db push && tsx prisma/seed.ts",
     "postinstall": "prisma generate"
   },

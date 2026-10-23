@@ -1,22 +1,14 @@
-import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
+import {
+  SESSION_COOKIE,
+  SESSION_TTL_SECONDS,
+  createSessionToken,
+  verifySessionToken,
+  type SessionPayload,
+} from "./session-token";
 
-export const SESSION_COOKIE = "af_session";
-const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
-
-export interface SessionPayload {
-  userId: string;
-  email: string;
-  role: "CUSTOMER" | "ADMIN";
-}
-
-function getSecret(): Uint8Array {
-  const secret = process.env.JWT_SECRET;
-  if (!secret || secret.length < 32) {
-    throw new Error("JWT_SECRET is missing or shorter than 32 characters. Set it in your .env file.");
-  }
-  return new TextEncoder().encode(secret);
-}
+export { SESSION_COOKIE, createSessionToken };
+export type { SessionPayload };
 
 export function cookieBaseOptions() {
   const domain = process.env.COOKIE_DOMAIN?.trim();
@@ -27,15 +19,6 @@ export function cookieBaseOptions() {
     path: "/",
     ...(domain ? { domain } : {}),
   };
-}
-
-export async function createSessionToken(payload: SessionPayload): Promise<string> {
-  return new SignJWT({ email: payload.email, role: payload.role })
-    .setProtectedHeader({ alg: "HS256" })
-    .setSubject(payload.userId)
-    .setIssuedAt()
-    .setExpirationTime(`${SESSION_TTL_SECONDS}s`)
-    .sign(getSecret());
 }
 
 export async function setSessionCookie(payload: SessionPayload): Promise<void> {
@@ -52,17 +35,5 @@ export async function clearSessionCookie(): Promise<void> {
 /** Returns the logged-in user's session, or null for guests / invalid tokens. */
 export async function getSession(): Promise<SessionPayload | null> {
   const store = await cookies();
-  const token = store.get(SESSION_COOKIE)?.value;
-  if (!token) return null;
-  try {
-    const { payload } = await jwtVerify(token, getSecret());
-    if (!payload.sub || typeof payload.email !== "string") return null;
-    return {
-      userId: payload.sub,
-      email: payload.email,
-      role: payload.role === "ADMIN" ? "ADMIN" : "CUSTOMER",
-    };
-  } catch {
-    return null;
-  }
+  return verifySessionToken(store.get(SESSION_COOKIE)?.value);
 }

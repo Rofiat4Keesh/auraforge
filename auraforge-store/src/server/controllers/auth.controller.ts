@@ -35,10 +35,23 @@ export const logoutController = handle(async () => {
   return ok({ loggedOut: true });
 });
 
-/** GET /api/auth/me — current user or null */
+/**
+ * GET /api/auth/me — current user or null.
+ * Also brings the session cookie up to date: the role is stored inside the signed cookie
+ * (the middleware reads it there), so when `npm run seed:admin` or Admin -> Customers changes
+ * someone's role, this call re-issues their cookie and the Admin Portal link works without
+ * signing out and back in. A cookie for a deleted account is cleared.
+ */
 export const meController = handle(async () => {
   const session = await getSession();
   if (!session) return ok(null);
   const user = await getUserById(session.userId);
-  return ok(user ? toSessionUser(user) : null);
+  if (!user) {
+    await clearSessionCookie();
+    return ok(null);
+  }
+  if (user.role !== session.role || user.email !== session.email) {
+    await setSessionCookie({ userId: user.id, email: user.email, role: user.role });
+  }
+  return ok(toSessionUser(user));
 });

@@ -1,5 +1,6 @@
 "use client";
 
+import { isPaidStatus } from "@/lib/order-status";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CheckCircle2, Clock, Loader2, RefreshCw, XCircle } from "lucide-react";
@@ -35,7 +36,7 @@ export function PaymentResult({ reference }: { reference: string | null }) {
       });
       attempts.current += 1;
       setState({ kind: "done", order });
-      if (order.status === "PAID" || order.status === "FULFILLED") await refreshCart();
+      if (isPaidStatus(order.status)) await refreshCart();
     } catch (error) {
       setState({
         kind: "error",
@@ -84,7 +85,7 @@ export function PaymentResult({ reference }: { reference: string | null }) {
   }
 
   const { order } = state;
-  const paid = order.status === "PAID" || order.status === "FULFILLED";
+  const paid = isPaidStatus(order.status);
   const pending = order.status === "PENDING";
 
   return (

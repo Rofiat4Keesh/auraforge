@@ -5,6 +5,7 @@ import { readCartToken } from "@/lib/cart-cookie";
 import { isValidWebhookSignature, type PaystackTransactionData } from "@/lib/paystack";
 import { checkoutSchema } from "@/lib/validators";
 import { prisma } from "@/lib/prisma";
+import { getUserById } from "@/server/services/user.service";
 import {
   canViewPrivate,
   confirmPayment,
@@ -14,13 +15,20 @@ import {
 } from "@/server/services/order.service";
 
 /**
- * POST /api/checkout/initialize
+ * POST /api/checkout/initialize — signed-in customers only (401 AUTH_REQUIRED otherwise)
  * Body: { email, fullName, phone, address, city, state, notes? }
  * Returns: { reference, authorizationUrl } — the browser then redirects to authorizationUrl (Paystack).
  */
 export const initializeCheckoutController = handle(async (req: NextRequest) => {
-  const input = checkoutSchema.parse(await readJson(req));
+  // Browsing and the cart are open to everyone; paying needs an account, so every order is
+  // linked to a customer who can track it. The checkout page shows its Sign in / Quick
+  // sign-up step when this 401 comes back, then retries automatically.
   const session = await getSession();
+  const account = session ? await getUserById(session.userId) : null;
+  if (!session || !account) {
+    throw new HttpError(401, "Please sign in or create an account to complete your purchase.", { code: "AUTH_REQUIRED" });
+  }
+  const input = checkoutSchema.parse(await readJson(req));
   const cartToken = await readCartToken();
   const result = await initializeCheckout(cartToken, session, input);
   return ok(result, 201);

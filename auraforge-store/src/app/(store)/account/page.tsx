@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { AccountView } from "@/components/account/AccountView";
 
 export const metadata: Metadata = {
@@ -11,7 +12,10 @@ export default function AccountPage() {
     <div className="container-x py-10">
       <p className="eyebrow">Account</p>
       <h1 className="mb-8 mt-2 text-3xl font-bold">Your AuraForge account</h1>
-      <AccountView />
+      {/* AccountView reads ?next= from the address bar, which Next.js requires inside Suspense. */}
+      <Suspense fallback={null}>
+        <AccountView />
+      </Suspense>
     </div>
   );
 }

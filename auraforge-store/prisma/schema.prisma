@@ -25,11 +25,14 @@ enum Role {
 }
 
 enum OrderStatus {
-  PENDING   // order created, waiting for payment
-  PAID      // Paystack confirmed payment
-  FAILED    // Paystack reported a failed/abandoned payment
+  PENDING    // order created, waiting for payment
+  PAID       // Paystack confirmed payment — ready to be packed
+  PROCESSING // being packed / prepared
+  SHIPPED    // handed to the courier
+  DELIVERED  // received by the customer
+  FAILED     // Paystack reported a failed/abandoned payment
   CANCELLED
-  FULFILLED // shipped / delivered
+  FULFILLED  // older orders marked "fulfilled" before Processing/Shipped/Delivered existed
 }
 
 enum TransactionStatus {

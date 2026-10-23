@@ -1,20 +1,26 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useState } from "react";
-import { Eye, EyeOff, Loader2, Search, Star } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Archive, ArchiveRestore, Check, Loader2, Pencil, Plus, Search, Star } from "lucide-react";
 import { ApiClientError, apiFetch } from "@/lib/api-client";
 import { formatMoney } from "@/lib/money";
 import type { AdminCategoryRow, AdminProductRow, Paged } from "@/types/admin";
 import { EmptyRow, Pagination, TableShell, formatDate, td, th } from "./ui";
 import { SafeImage } from "@/components/ui/SafeImage";
+import { ProductQuickModal } from "./ProductQuickModal";
 
 interface Props {
   categories: AdminCategoryRow[];
   initialStock: string;
+  /** Product id to open in the edit pop-up straight away (used by the dashboard's low-stock list). */
+  initialEdit?: string;
 }
 
-export function ProductsTable({ categories, initialStock }: Props) {
+/**
+ * Inventory table. "Add product" and clicking a row open a pop-up (create / edit);
+ * "Archive" hides a product from the shop without deleting it, so past orders stay intact.
+ */
+export function ProductsTable({ categories, initialStock, initialEdit = "" }: Props) {
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
   const [categoryId, setCategoryId] = useState("");
@@ -26,6 +32,17 @@ export function ProductsTable({ categories, initialStock }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [toggling, setToggling] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  // undefined = pop-up closed, null = adding a new product, string = editing that product
+  const [editing, setEditing] = useState<string | null | undefined>(initialEdit || undefined);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const closeModal = useCallback(() => setEditing(undefined), []);
+
+  useEffect(() => {
+    if (!notice) return;
+    const t = setTimeout(() => setNotice(null), 4000);
+    return () => clearTimeout(t);
+  }, [notice]);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(query.trim()), 350);
@@ -63,8 +80,9 @@ export function ProductsTable({ categories, initialStock }: Props) {
         body: JSON.stringify({ active: !row.active }),
       });
       setReloadKey((k) => k + 1);
+      setNotice(row.active ? `"${row.name}" archived. It's hidden from the shop.` : `"${row.name}" is back in the shop.`);
     } catch (e) {
-      setError(e instanceof ApiClientError ? e.message : "Could not change visibility.");
+      setError(e instanceof ApiClientError ? e.message : "Could not archive or restore this product.");
     } finally {
       setToggling(null);
     }
@@ -118,9 +136,9 @@ export function ProductsTable({ categories, initialStock }: Props) {
           }}
           aria-label="Visibility"
         >
-          <option value="">Visible and hidden</option>
-          <option value="active">Visible in shop</option>
-          <option value="hidden">Hidden</option>
+          <option value="">Live and archived</option>
+          <option value="active">Live in shop</option>
+          <option value="hidden">Archived</option>
         </select>
         <select
           id="products-stock"
@@ -136,7 +154,16 @@ export function ProductsTable({ categories, initialStock }: Props) {
           <option value="low">Low stock (5 or fewer)</option>
           <option value="out">Out of stock</option>
         </select>
+        <button type="button" onClick={() => setEditing(null)} className="btn-primary ml-auto">
+          <Plus className="h-4 w-4" /> Add product
+        </button>
       </div>
+
+      {notice && (
+        <p className="mb-4 flex items-center gap-2 rounded-xl border border-neon-lime/40 bg-neon-lime/5 p-3 text-sm text-neon-lime" role="status">
+          <Check className="h-4 w-4" /> {notice}
+        </p>
+      )}
 
       {error && <p className="mb-4 rounded-xl border border-neon-magenta/40 p-3 text-sm text-neon-magenta">{error}</p>}
 
@@ -148,7 +175,7 @@ export function ProductsTable({ categories, initialStock }: Props) {
             <th className={`${th} text-right`}>Price</th>
             <th className={`${th} text-right`}>Stock</th>
             <th className={th}>Updated</th>
-            <th className={`${th} text-right`}>Shop</th>
+            <th className={`${th} text-right`}>Actions</th>
           </tr>
         </thead>
         <tbody className={`divide-y divide-obsidian-800 ${loading ? "opacity-60" : ""}`}>
@@ -162,7 +189,7 @@ export function ProductsTable({ categories, initialStock }: Props) {
             data?.rows.map((p) => (
               <tr key={p.id} className={`transition hover:bg-obsidian-850 ${p.active ? "" : "opacity-60"}`}>
                 <td className={td}>
-                  <Link href={`/admin/products/${p.id}`} className="flex items-center gap-3">
+                  <button type="button" onClick={() => setEditing(p.id)} className="flex items-center gap-3 text-left">
                     <SafeImage
                       src={p.image}
                       alt=""
@@ -177,9 +204,10 @@ export function ProductsTable({ categories, initialStock }: Props) {
                       </span>
                       <span className="block text-xs text-ink-500">
                         {p.brand} · {p.variantCount} variant{p.variantCount === 1 ? "" : "s"} · {p.source}
+                        {!p.active && " · archived"}
                       </span>
                     </span>
-                  </Link>
+                  </button>
                 </td>
                 <td className={`${td} text-ink-300`}>{p.categoryName}</td>
                 <td className={`${td} whitespace-nowrap text-right font-mono tabular-nums`}>
@@ -201,22 +229,27 @@ export function ProductsTable({ categories, initialStock }: Props) {
                 </td>
                 <td className={`${td} whitespace-nowrap text-xs text-ink-400`}>{formatDate(p.updatedAt)}</td>
                 <td className={`${td} text-right`}>
-                  <button
-                    type="button"
-                    onClick={() => toggle(p)}
-                    disabled={toggling === p.id}
-                    className={`chip ${p.active ? "chip-active" : ""}`}
-                    aria-label={p.active ? `Hide ${p.name} from the shop` : `Show ${p.name} in the shop`}
-                  >
-                    {toggling === p.id ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    ) : p.active ? (
-                      <Eye className="h-3 w-3" />
-                    ) : (
-                      <EyeOff className="h-3 w-3" />
-                    )}
-                    {p.active ? "Visible" : "Hidden"}
-                  </button>
+                  <div className="flex justify-end gap-1.5">
+                    <button type="button" onClick={() => setEditing(p.id)} className="chip" aria-label={`Edit ${p.name}`}>
+                      <Pencil className="h-3 w-3" /> Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => toggle(p)}
+                      disabled={toggling === p.id}
+                      className={`chip ${p.active ? "hover:border-neon-magenta/60 hover:text-neon-magenta" : "chip-active"}`}
+                      aria-label={p.active ? `Archive ${p.name} (hide it from the shop)` : `Restore ${p.name} to the shop`}
+                    >
+                      {toggling === p.id ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : p.active ? (
+                        <Archive className="h-3 w-3" />
+                      ) : (
+                        <ArchiveRestore className="h-3 w-3" />
+                      )}
+                      {p.active ? "Archive" : "Restore"}
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))
@@ -229,6 +262,18 @@ export function ProductsTable({ categories, initialStock }: Props) {
           <Pagination page={data.page} totalPages={data.totalPages} onChange={setPage} />
         </div>
       )}
+
+      <ProductQuickModal
+        open={editing !== undefined}
+        productId={editing ?? null}
+        categories={categories}
+        onClose={closeModal}
+        onSaved={(_product, message) => {
+          setEditing(undefined);
+          setNotice(message);
+          setReloadKey((k) => k + 1);
+        }}
+      />
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ADMIN_SETTABLE_STATUSES } from "./order-status";
 
 /** Prices in admin forms are typed in Naira (major units); the service converts them to kobo. */
 const naira = z.coerce.number().min(0, "Price cannot be negative").max(1_000_000_000);
@@ -87,7 +88,7 @@ export const categoryInputSchema = z.object({
 export type CategoryInput = z.infer<typeof categoryInputSchema>;
 
 export const orderStatusUpdateSchema = z.object({
-  status: z.enum(["FULFILLED", "CANCELLED", "PAID"]),
+  status: z.enum(ADMIN_SETTABLE_STATUSES),
   restock: z.boolean().optional(),
 });
 

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { SlidersHorizontal } from "lucide-react";
 import { ProductsTable } from "@/components/admin/ProductsTable";
 import { PageHeader } from "@/components/admin/ui";
 import { getAdminUser } from "@/lib/admin-guard";
@@ -15,19 +15,20 @@ export default async function AdminProductsPage({ searchParams }: Props) {
   if (!(await getAdminUser())) return null;
   const [params, categories] = await Promise.all([searchParams, listAdminCategories()]);
   const stock = params.stock === "low" || params.stock === "out" ? params.stock : "";
+  const edit = typeof params.edit === "string" && /^[a-f0-9]{24}$/i.test(params.edit) ? params.edit : "";
 
   return (
     <>
       <PageHeader
         title="Products"
-        description="Edit prices and stock, add products, or hide items from the shop."
+        description="Click a product to edit its title, price (₦), stock, image and specs. Archive hides it from the shop."
         actions={
-          <Link href="/admin/products/new" className="btn-primary">
-            <Plus className="h-4 w-4" /> Add product
+          <Link href="/admin/products/new" className="btn-ghost">
+            <SlidersHorizontal className="h-4 w-4" /> Advanced editor (variants, galleries)
           </Link>
         }
       />
-      <ProductsTable categories={categories} initialStock={stock} />
+      <ProductsTable categories={categories} initialStock={stock} initialEdit={edit} />
     </>
   );
 }

@@ -1,11 +1,12 @@
 import { randomBytes } from "crypto";
-import type { Order, OrderStatus, PaystackTransaction, Prisma, User } from "@prisma/client";
+import type { Order, OrderStatus, PaystackTransaction, Prisma, TransactionStatus, User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { HttpError } from "@/lib/http";
 import type { CategoryInput, ProductInput } from "@/lib/admin-validators";
 import { getProductSource } from "@/server/suppliers";
 import { syncFromSource } from "@/server/suppliers/sync";
 import { adjustStockForOrder, toOrderDTO } from "./order.service";
+import { NEXT_STATUSES, ORDER_STATUSES, REVENUE_STATUSES, STATUS_LABEL, type AdminSettableStatus } from "@/lib/order-status";
 import type {
   AdminCategoryRow,
   AdminCustomerRow,
@@ -15,11 +16,13 @@ import type {
   AdminProductRow,
   AdminStats,
   AdminSyncResult,
+  AdminTransactionRow,
   Paged,
+  PagedTransactions,
 } from "@/types/admin";
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
-const PAID_STATUSES: OrderStatus[] = ["PAID", "FULFILLED"];
+const PAID_STATUSES: OrderStatus[] = REVENUE_STATUSES;
 const LOW_STOCK_LIMIT = 5;
 const PAGE_SIZE = 20;
 
@@ -72,17 +75,21 @@ export async function getDashboardStats(): Promise<AdminStats> {
   const since14 = new Date(now.getTime() - 13 * 24 * 60 * 60 * 1000);
   const today = lagosDay(now);
 
-  const [paid30, pendingOrders, toFulfil, customers, activeProducts, products, recent] = await Promise.all([
+  const [paid30, allTimeRevenue, totalOrders, pendingOrders, toFulfil, customers, activeProducts, products, recent, recentSales] = await Promise.all([
     prisma.order.findMany({
       where: { status: { in: PAID_STATUSES }, paidAt: { gte: since30 } },
       select: { total: true, paidAt: true },
     }),
+    prisma.order.aggregate({ where: { status: { in: PAID_STATUSES } }, _sum: { total: true }, _count: { _all: true } }),
+    prisma.order.count(),
     prisma.order.count({ where: { status: "PENDING" } }),
-    prisma.order.count({ where: { status: "PAID" } }),
+    // "To ship" = paid or being packed, not yet handed to the courier.
+    prisma.order.count({ where: { status: { in: ["PAID", "PROCESSING"] } } }),
     prisma.user.count({ where: { role: "CUSTOMER" } }),
     prisma.product.count({ where: { active: true } }),
     prisma.product.findMany({ where: { active: true }, select: { id: true, name: true, variants: true } }),
     prisma.order.findMany({ orderBy: { createdAt: "desc" }, take: 8 }),
+    prisma.order.findMany({ where: { status: { in: PAID_STATUSES } }, orderBy: { paidAt: "desc" }, take: 8 }),
   ]);
 
   const revenue30d = paid30.reduce((sum, o) => sum + o.total, 0);
@@ -101,16 +108,21 @@ export async function getDashboardStats(): Promise<AdminStats> {
     }
   }
 
-  const lowStock = products
+  const allLowStock = products
     .flatMap((p) =>
       p.variants
         .filter((v) => v.stock <= LOW_STOCK_LIMIT)
         .map((v) => ({ id: p.id, name: p.name, sku: v.sku, label: v.label, stock: v.stock })),
     )
-    .sort((a, b) => a.stock - b.stock)
-    .slice(0, 10);
+    .sort((a, b) => a.stock - b.stock);
+  const lowStock = allLowStock.slice(0, 10);
 
   return {
+    totalRevenue: allTimeRevenue._sum.total ?? 0,
+    totalPaidOrders: allTimeRevenue._count._all,
+    totalOrders,
+    lowStockCount: allLowStock.length,
+    outOfStockCount: allLowStock.filter((v) => v.stock === 0).length,
     revenueToday,
     revenue30d,
     paidOrders30d: paid30.length,
@@ -122,6 +134,7 @@ export async function getDashboardStats(): Promise<AdminStats> {
     dailyRevenue: [...buckets.entries()].map(([date, v]) => ({ date, ...v })),
     lowStock,
     recentOrders: recent.map(toOrderRow),
+    recentSales: recentSales.map(toOrderRow),
   };
 }
 
@@ -131,8 +144,7 @@ export async function getDashboardStats(): Promise<AdminStats> {
 
 export async function listOrders(params: { q?: string; status?: string; page: number }): Promise<Paged<AdminOrderRow>> {
   const and: Prisma.OrderWhereInput[] = [];
-  const statuses: OrderStatus[] = ["PENDING", "PAID", "FAILED", "CANCELLED", "FULFILLED"];
-  if (params.status && statuses.includes(params.status as OrderStatus)) {
+  if (params.status && ORDER_STATUSES.includes(params.status as OrderStatus)) {
     and.push({ status: params.status as OrderStatus });
   }
   if (params.q) {
@@ -159,6 +171,7 @@ function toAdminOrderDetail(
   return {
     ...toOrderDTO(order, true),
     stockDeducted: order.stockDeducted,
+    allowedTransitions: NEXT_STATUSES[order.status],
     account: order.user ? { id: order.user.id, fullName: order.user.fullName, email: order.user.email } : null,
     transactions: order.transactions
       .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
@@ -185,31 +198,22 @@ export async function getOrderDetail(reference: string): Promise<AdminOrderDetai
 }
 
 /**
- * Allowed status changes:
- *   PAID -> FULFILLED        (shipped / delivered)
- *   FULFILLED -> PAID        (undo a mistaken "fulfilled")
- *   PENDING / FAILED -> CANCELLED
- *   PAID / FULFILLED -> CANCELLED  (optionally puts the stock back; refund the money in Paystack)
+ * Moves an order to its next status (see NEXT_STATUSES in src/lib/order-status.ts):
+ *   PAID -> PROCESSING -> SHIPPED -> DELIVERED, or CANCELLED before shipping.
+ * Cancelling a paid order can put the stock back; refund the money in your Paystack dashboard.
  */
 export async function updateOrderStatus(
   reference: string,
-  next: "FULFILLED" | "CANCELLED" | "PAID",
+  next: AdminSettableStatus,
   restock: boolean,
 ): Promise<AdminOrderDetail> {
   const order = await prisma.order.findUnique({ where: { reference } });
   if (!order) throw new HttpError(404, "Order not found.");
 
-  const allowed: Record<OrderStatus, OrderStatus[]> = {
-    PENDING: ["CANCELLED"],
-    FAILED: ["CANCELLED"],
-    PAID: ["FULFILLED", "CANCELLED"],
-    FULFILLED: ["PAID", "CANCELLED"],
-    CANCELLED: [],
-  };
-  if (!allowed[order.status].includes(next)) {
+  if (!NEXT_STATUSES[order.status].includes(next)) {
     throw new HttpError(
       409,
-      `An order that is ${order.status.toLowerCase()} cannot be changed to ${next.toLowerCase()}.`,
+      `An order that is "${STATUS_LABEL[order.status]}" cannot be changed to "${STATUS_LABEL[next]}".`,
     );
   }
 
@@ -427,6 +431,92 @@ export async function setProductActive(id: string, active: boolean): Promise<Adm
   await getAdminProduct(id);
   await prisma.product.update({ where: { id }, data: { active } });
   return getAdminProduct(id);
+}
+
+// ---------------------------------------------------------------------------
+// Transactions (Paystack payment log)
+// ---------------------------------------------------------------------------
+
+const TRANSACTION_STATUSES: TransactionStatus[] = ["INITIALIZED", "SUCCESS", "FAILED", "ABANDONED"];
+
+/**
+ * Every Paystack payment attempt, newest first, with the order it belongs to.
+ * Filter by status, search by reference / Paystack id / email, and an optional date range (Lagos days).
+ */
+export async function listTransactions(params: {
+  q?: string;
+  status?: string;
+  from?: string;
+  to?: string;
+  page: number;
+}): Promise<PagedTransactions> {
+  const and: Prisma.PaystackTransactionWhereInput[] = [];
+  if (params.status && TRANSACTION_STATUSES.includes(params.status as TransactionStatus)) {
+    and.push({ status: params.status as TransactionStatus });
+  }
+  if (params.q) {
+    const q = params.q.trim();
+    and.push({
+      OR: [
+        { reference: { contains: q, mode: "insensitive" } },
+        { paystackId: { contains: q } },
+        { customerEmail: { contains: q, mode: "insensitive" } },
+      ],
+    });
+  }
+  const day = /^\d{4}-\d{2}-\d{2}$/;
+  const created: Prisma.DateTimeFilter = {};
+  // Lagos is UTC+1 all year (no daylight saving), so a Lagos day starts at 23:00 UTC the day before.
+  if (params.from && day.test(params.from)) created.gte = new Date(`${params.from}T00:00:00+01:00`);
+  if (params.to && day.test(params.to)) created.lt = new Date(new Date(`${params.to}T00:00:00+01:00`).getTime() + 24 * 60 * 60 * 1000);
+  if (created.gte || created.lt) and.push({ createdAt: created });
+
+  const where: Prisma.PaystackTransactionWhereInput = and.length ? { AND: and } : {};
+  const [total, success, failedCount, pendingCount] = await Promise.all([
+    prisma.paystackTransaction.count({ where }),
+    prisma.paystackTransaction.aggregate({ where: { AND: [where, { status: "SUCCESS" }] }, _sum: { amount: true }, _count: { _all: true } }),
+    prisma.paystackTransaction.count({ where: { AND: [where, { status: { in: ["FAILED", "ABANDONED"] } }] } }),
+    prisma.paystackTransaction.count({ where: { AND: [where, { status: "INITIALIZED" }] } }),
+  ]);
+  const { page, totalPages, skip } = pageOf(params.page, total);
+  const rows = await prisma.paystackTransaction.findMany({
+    where,
+    orderBy: { createdAt: "desc" },
+    skip,
+    take: PAGE_SIZE,
+    include: { order: { select: { reference: true, status: true, shipping: true } } },
+  });
+
+  return {
+    rows: rows.map(
+      (t): AdminTransactionRow => ({
+        reference: t.reference,
+        paystackId: t.paystackId ?? null,
+        status: t.status,
+        amount: t.amount,
+        currency: t.currency,
+        channel: t.channel ?? null,
+        gatewayResponse: t.gatewayResponse ?? null,
+        lastSource: t.lastSource,
+        customerEmail: t.customerEmail,
+        customerName: t.order.shipping?.fullName ?? t.customerEmail,
+        orderReference: t.order.reference,
+        orderStatus: t.order.status,
+        paidAt: t.paidAt?.toISOString() ?? null,
+        createdAt: t.createdAt.toISOString(),
+        updatedAt: t.updatedAt.toISOString(),
+      }),
+    ),
+    total,
+    page,
+    totalPages,
+    totals: {
+      successAmount: success._sum.amount ?? 0,
+      successCount: success._count._all,
+      failedCount,
+      pendingCount,
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { AlertTriangle, Loader2, Minus, Plus, ShoppingBag, Trash2, Truck, X } from "lucide-react";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { useCart } from "@/components/providers/CartProvider";
 import { formatMoney } from "@/lib/money";
 import { SafeImage } from "@/components/ui/SafeImage";
@@ -10,6 +11,7 @@ import { SafeImage } from "@/components/ui/SafeImage";
 /** Slide-over cart. Totals are always the server-calculated values returned by the cart API. */
 export function CartDrawer() {
   const { cart, isOpen, closeCart, updateQuantity, removeItem, busyItemIds } = useCart();
+  const { user } = useAuth();
   const closeButton = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -189,8 +191,11 @@ export function CartDrawer() {
                 aria-disabled={hasUnavailable}
                 className={`btn-primary mt-4 w-full ${hasUnavailable ? "pointer-events-none opacity-50" : ""}`}
               >
-                Secure checkout
+                Proceed to Checkout
               </Link>
+              {!user && (
+                <p className="mt-2 text-center text-[11px] text-ink-500">You&apos;ll sign in or create an account on the next step.</p>
+              )}
               <button
                 type="button"
                 onClick={closeCart}

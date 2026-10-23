@@ -3,13 +3,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Home, LayoutGrid, Menu, Search, ShoppingBag, User, X } from "lucide-react";
+import { Home, LayoutGrid, Menu, Search, ShieldCheck, ShoppingBag, User, X } from "lucide-react";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { useCart } from "@/components/providers/CartProvider";
 import { Logo } from "./Logo";
 import { SearchBar } from "./SearchBar";
 
 /**
- * HEADER — core navigation only: Logo, Home, Shop, Search, Cart (live count), Account.
+ * HEADER — core navigation only: Logo, Home, Shop, Search, Cart (live count), Sign In / Account,
+ * plus an "Admin Portal" link that appears only for signed-in administrators.
  * Legal text, policies and addresses live exclusively in the Footer.
  */
 
@@ -21,6 +23,7 @@ const NAV = [
 export function Header() {
   const pathname = usePathname();
   const { cart, openCart } = useCart();
+  const { user, isAdmin } = useAuth();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [mobileSearch, setMobileSearch] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -53,6 +56,8 @@ export function Header() {
 
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
   const count = cart.itemCount;
+  const accountLabel = user ? "Account" : "Sign In";
+  const firstName = user?.fullName.split(" ")[0] ?? "";
 
   return (
     <>
@@ -109,12 +114,24 @@ export function Header() {
               <Search className="h-5 w-5" />
             </button>
 
+            {isAdmin && (
+              <Link
+                href="/admin"
+                className="hidden items-center gap-1.5 rounded-lg border border-neon-violet/50 bg-neon-violet/10 px-3 py-1.5 text-xs font-semibold text-neon-violet transition hover:bg-neon-violet/20 md:inline-flex"
+              >
+                <ShieldCheck className="h-4 w-4" /> Admin Portal
+              </Link>
+            )}
+
             <Link
               href="/account"
-              className={`icon-btn ${isActive("/account") ? "text-neon-cyan" : ""}`}
-              aria-label="Account"
+              className={`flex h-10 items-center gap-2 rounded-lg px-2 text-sm font-medium transition hover:text-neon-cyan ${
+                isActive("/account") ? "text-neon-cyan" : "text-ink-300"
+              }`}
+              aria-label={user ? `Account — signed in as ${user.fullName}` : "Sign In"}
             >
               <User className="h-5 w-5" />
+              <span className="hidden sm:inline">{user ? firstName || accountLabel : accountLabel}</span>
             </Link>
 
             <button
@@ -170,7 +187,11 @@ export function Header() {
               <SearchBar onSubmitted={() => setDrawerOpen(false)} />
             </div>
             <nav className="flex flex-col gap-1 px-3" aria-label="Mobile">
-              {[...NAV, { href: "/account", label: "Account", icon: User }].map((item) => (
+              {[
+                ...NAV,
+                { href: "/account", label: accountLabel, icon: User },
+                ...(isAdmin ? [{ href: "/admin", label: "Admin Portal", icon: ShieldCheck }] : []),
+              ].map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}

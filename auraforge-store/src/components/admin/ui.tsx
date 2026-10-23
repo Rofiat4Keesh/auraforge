@@ -2,23 +2,19 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { OrderStatusDTO } from "@/types";
+import { STATUS_LABEL } from "@/lib/order-status";
 
 /** Small shared building blocks for the admin portal. */
 
 const STATUS_STYLE: Record<OrderStatusDTO, string> = {
   PENDING: "border-ink-500/40 bg-ink-500/10 text-ink-300",
   PAID: "border-neon-lime/40 bg-neon-lime/10 text-neon-lime",
+  PROCESSING: "border-neon-violet/50 bg-neon-violet/10 text-neon-violet",
+  SHIPPED: "border-neon-cyan/40 bg-neon-cyan/10 text-neon-cyan",
+  DELIVERED: "border-neon-cyan/60 bg-neon-cyan/20 text-ink-100",
   FULFILLED: "border-neon-cyan/40 bg-neon-cyan/10 text-neon-cyan",
   FAILED: "border-neon-magenta/40 bg-neon-magenta/10 text-neon-magenta",
   CANCELLED: "border-obsidian-500 bg-obsidian-800 text-ink-500",
-};
-
-const STATUS_LABEL: Record<OrderStatusDTO, string> = {
-  PENDING: "Awaiting payment",
-  PAID: "Paid · to ship",
-  FULFILLED: "Fulfilled",
-  FAILED: "Payment failed",
-  CANCELLED: "Cancelled",
 };
 
 export function StatusPill({ status }: { status: OrderStatusDTO }) {

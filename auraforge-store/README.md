@@ -21,7 +21,7 @@ Next.js (App Router) + React + Tailwind CSS · Node.js API routes · MongoDB wit
 10. [API reference](#10-api-reference)
 11. [Folder map](#11-folder-map)
 12. [Troubleshooting](#12-troubleshooting)
-13. [Admin portal](#13-admin-portal)
+13. [Accounts, checkout sign-in and the Admin Portal](#13-accounts-checkout-sign-in-and-the-admin-portal)
 
 ---
 
@@ -271,7 +271,7 @@ Any Node.js host works (Vercel, Railway, Render, a VPS). On the host:
 - [ ] Policy text in `src/app/(store)/policies/[slug]/page.tsx` reviewed by your legal adviser
 - [ ] Live Paystack keys (your Paystack business must be activated)
 - [ ] Demo products replaced with your real catalog
-- [ ] Demo accounts `demo@auraforge.test` and `admin@auraforge.test` deleted (via `npm run db:studio`), and your own admin created with `npm run admin:create`
+- [ ] Demo accounts `demo@auraforge.test` and `admin@auraforge.test` deleted (via `npm run db:studio`), and your own admin created with `npm run seed:admin`
 
 ---
 
@@ -463,7 +463,7 @@ All responses use the shape `{ "success": true, "data": … }` or `{ "success": 
 | POST | `/api/cart/items` | Add `{ productId, variantSku, quantity }`. Checks stock. |
 | PATCH | `/api/cart/items/:itemId` | Set `{ quantity }` (0 removes). |
 | DELETE | `/api/cart/items/:itemId` | Remove a line. |
-| POST | `/api/checkout/initialize` | `{ email, fullName, phone, address, city, state, notes? }` → creates a PENDING order and returns `{ reference, authorizationUrl }`. |
+| POST | `/api/checkout/initialize` | **Signed-in only** (answers `401` with `details.code = "AUTH_REQUIRED"` otherwise). `{ email, fullName, phone, address, city, state, notes? }` → creates a PENDING order and returns `{ reference, authorizationUrl }`. |
 | GET | `/api/checkout/verify?reference=…` | Verifies with Paystack, marks the order PAID, deducts stock, empties the cart. |
 | POST | `/api/webhooks/paystack` | Paystack webhook (`charge.success`, `charge.failed`), signature-checked. |
 | GET | `/api/orders` | Signed-in customer's orders. |
@@ -471,9 +471,9 @@ All responses use the shape `{ "success": true, "data": … }` or `{ "success": 
 | POST | `/api/auth/register` | `{ fullName, email, phone?, password }` |
 | POST | `/api/auth/login` | `{ email, password }` |
 | POST | `/api/auth/logout` | Sign out. |
-| GET | `/api/auth/me` | Current user or `null`. |
+| GET | `/api/auth/me` | Current user or `null`. Also refreshes the sign-in cookie if the account's role changed. |
 | GET | `/api/health` | App + database status. |
-| — | `/api/admin/*` | Admin-only endpoints used by the admin portal (stats, orders, products, categories, customers, sync). See section 13. |
+| — | `/api/admin/*` | Admin-only endpoints used by the Admin Portal (stats, orders, products, transactions, categories, customers, sync). Guarded by `src/middleware.ts` (401/403) and re-checked in the database. `PATCH /api/admin/orders/:reference` takes `{ status: "PROCESSING" \| "SHIPPED" \| "DELIVERED" \| "CANCELLED", restock? }`. `GET /api/admin/transactions` takes `status`, `q`, `from`, `to` (YYYY-MM-DD) and `page`. See section 13. |
 
 Example:
 
@@ -496,7 +496,8 @@ auraforge-store/
 │   ├── load-env.ts              ← reads .env for command-line scripts
 │   ├── cache-product-images.js  ← saves genuine product photos into public/images/products (section 8.1a)
 │   ├── sync-supplier.ts         ← npm run supplier:sync
-│   └── make-admin.ts            ← npm run admin:create
+│   ├── make-admin.ts            ← npm run admin:create
+│   └── seed-admin.ts            ← npm run seed:admin (first admin from .env)
 └── src/
     ├── app/                     ← PAGES and API ROUTES (Next.js App Router)
     │   ├── layout.tsx           ← <html>/<body> shell and fonts only
@@ -515,7 +516,8 @@ auraforge-store/
     │   ├── controllers/         ← turn HTTP requests into service calls (Express-style controllers)
     │   ├── services/            ← business logic: catalog filters, cart, orders & payments, users
     │   └── suppliers/           ← RESELLER LAYER: mock catalog, HTTP supplier adapter, sync job
-    ├── components/              ← React UI: layout, catalog, product, cart, checkout, account
+    ├── components/              ← React UI: layout, catalog, product, cart, checkout, account, auth (sign-in form, Unauthorized alert), admin
+    ├── middleware.ts            ← blocks /admin and /api/admin for anyone who is not an ADMIN
     ├── lib/                     ← money (₦ formatting), Paystack client, auth, validation, config
     └── types/                   ← data shapes shared by server and browser
 ```
@@ -551,48 +553,76 @@ auraforge-store/
 
 ---
 
-## 13. Admin portal
+## 13. Accounts, checkout sign-in and the Admin Portal
 
-Open <http://localhost:3000/admin> (or `https://www.yourdomain.ng/admin` when live). It has its own layout and sign-in screen; the shop's header and footer are not shown there, and nothing in the shop's header links to it.
+### 13.1 How shoppers move through the store
 
-### 13.1 Sign in
+1. **Browsing is open to everyone.** Home, Shop, search, product pages and the cart never ask anyone to sign in. The cart is remembered in the browser (a cookie) even for guests.
+2. **Checkout asks for an account.** Clicking **Proceed to Checkout** shows step 1 of 3, *Account*: **Sign in** or **Quick sign-up** (full name, email, optional phone, password). The guest cart is attached to the account automatically, so nothing is lost.
+3. **Delivery details** (step 2) are pre-filled from the account, then **Pay ₦…** sends the shopper to Paystack's secure page (step 3).
+4. If a sign-in expires while someone is typing their address, the server answers "Please sign in…", the sign-in step reappears with their details kept, and payment continues by itself once they sign in.
 
-- **Demo:** after `npm run setup`, sign in with `admin@auraforge.test` / `Admin12345!`.
-- **Your own admin account** — pick one:
+The header shows **Sign In** for visitors and the shopper's first name (**Account**) once signed in. Admins also see an **Admin Portal** button in the header (and in the phone menu). Customers never see it.
 
-  ```bash
-  # Option 1: sign up normally on the site (/account), then promote that account:
-  npm run admin:create -- --email you@yourdomain.ng
+### 13.2 Create your first admin: `npm run seed:admin`
 
-  # Option 2: create a new admin account directly:
-  npm run admin:create -- --email you@yourdomain.ng --password "AStrongPassword123" --name "Your Name"
+1. Open your `.env` file and fill in:
 
-  # Remove someone's admin access:
-  npm run admin:create -- --email someone@yourdomain.ng --revoke
-  ```
+   ```bash
+   ADMIN_EMAIL="owner@yourdomain.ng"
+   ADMIN_PASSWORD="Choose-a-long-password-2026"
+   ADMIN_NAME="Your Full Name"
+   ```
 
-  (The `--` after `admin:create` is needed: it passes the rest of the line to the script.)
+2. Run:
 
-Admins also see an **Open admin console** button on their `/account` page.
+   ```bash
+   npm run seed:admin
+   ```
 
-### 13.2 What each page does
+   You should see `✔ Admin account created for owner@yourdomain.ng.` Running it again is safe: an existing account is simply made an admin. Add `--reset-password` to also change its password to `ADMIN_PASSWORD`.
+3. Delete the `ADMIN_PASSWORD` line from `.env` (the account now exists; there is no need to keep the password in a file).
+4. Open the shop, click **Sign In**, sign in with that email and password, and click **Admin Portal** in the header.
+
+Other ways to manage admins:
+
+```bash
+# Make an existing customer account an admin (they keep their password):
+npm run admin:create -- --email someone@yourdomain.ng
+
+# Remove someone's admin access:
+npm run admin:create -- --email someone@yourdomain.ng --revoke
+```
+
+(The `--` passes the rest of the line to the script.) After `npm run setup` there is also a demo admin: `admin@auraforge.test` / `Admin12345!`. **Remove or revoke it before going live.**
+
+### 13.3 Who can open `/admin`
+
+- `src/middleware.ts` runs before every `/admin` page and `/api/admin/*` request. Anyone without an admin sign-in is sent to the home page, which shows an **Unauthorized Access** alert ("please sign in with an administrator account" or "your account doesn't have administrator permissions"). The admin API answers `401` or `403` instead.
+- Every admin page and API handler then checks the role again **in the database**, so removing someone's admin role works on their very next click.
+- The role can only be set by `npm run seed:admin` / `npm run admin:create`. Sign-up always creates a `CUSTOMER`, whatever the browser sends.
+
+### 13.4 What each Admin Portal page does
 
 | Page | What you can do |
 | --- | --- |
-| **Dashboard** | Sales today and over 30 days, average order, customer count, a 14-day sales chart (Lagos time), paid orders waiting to ship, orders awaiting payment, variants with 5 or fewer units left, latest orders. |
-| **Orders** | Filter by status (To ship, Awaiting payment, Fulfilled, Failed, Cancelled) and search by reference, email, name or phone. Open an order to see items, delivery address (with a Copy button), Paystack payment records, and to **Mark as fulfilled**, move it back, **Cancel** (optionally putting stock back), or **Print slip**. |
-| **Products** | Search by name, brand or SKU; filter by category, visibility and low/out of stock; show or hide a product with one click. **Add product** / edit opens the product editor: name, brand, category, descriptions, images (paste photo links, reorder, or add the built-in placeholder renders), variants (SKU, options, price in ₦, "was" price, stock, which image to show), specifications (these power the shop filters), tags, featured flag, supplier SKU and cost price (shows your margin). |
+| **Dashboard** | Revenue cards in ₦ (total revenue, today, last 30 days with average order), **Total orders**, a **Low-stock alerts** card (5 units or fewer, with a "sold out" badge), paid orders waiting to be packed/shipped, orders awaiting payment, a 14-day sales chart (Lagos time), the low-stock list, a **Recent sales** table and the latest orders. |
+| **Orders** | Filter chips: Pending, Paid · to pack, Processing, Shipped, Delivered, Failed, Cancelled (plus "Fulfilled (older)" for orders from before these statuses existed). Search by reference, email, name or phone. **Click an order** to open a pop-up with the items, **shipping information**, the customer's **phone number** (tap to call), the **Paystack reference** (with Copy) and payment attempts, and a **status selector**: Paid → Processing → Shipped → Delivered, or Cancel (optionally putting stock back). Only valid next steps are offered, e.g. an unpaid order cannot be marked Shipped. "Full page" opens a printable packing slip. |
+| **Products** | The inventory table. **Add product** or click any product to open a pop-up with **Title, Brand, Category, Price (₦), Stock, Image URL** (with a live preview), **Description** and **Tech specs** (one `Name: value` per line). Products with several options show a price and stock box per option. **Archive** hides a product from the shop without deleting it (old orders stay correct); **Restore** brings it back. The **Advanced editor** still handles galleries, variants, tags and cost prices. |
+| **Transactions** | Every Paystack payment attempt: date, Paystack reference and ID, customer, channel (card, bank transfer, USSD…), result (Success / Started / Failed / Abandoned), the order's status, and amount in ₦. Totals for the current filter, a date range, search, and **Download CSV** for your accountant. |
 | **Categories** | Add, rename, reorder and delete (only when empty). |
 | **Customers** | Registered accounts with paid order count, total spent, last order date; expand a row to see that customer's orders. |
 | **Supplier sync** | Shows the current product source and runs a sync with one button, then reports what was added, updated, hidden or skipped. |
 
-### 13.3 Good to know
+**Sign out** in the Admin Portal takes you back to the shop's home page.
+
+### 13.5 Good to know
 
 - **Refunds** are made in your Paystack dashboard (Transactions → the payment → Refund). Cancelling a paid order in the admin records the cancellation and can put stock back, but it does not move money.
-- **Products are hidden, not deleted**, so old orders always point at a real product.
-- **Supplier products vs your own:** products created in the admin are marked `manual` and are never changed by a supplier sync. Products that came from a feed (including the demo `mock` catalog) are refreshed by the sync, which replaces edits made to them in the admin. The editor shows a warning on those products.
-- **Images:** the editor stores image links. Upload your photos to an image host or your supplier's CDN and paste the `https://` link.
-- **Security:** every `/api/admin/*` request checks, on the server, that the signed-in user is an admin in the database (not just in the login cookie), so removing someone's admin role takes effect on their next click.
+- **Products are archived, not deleted**, so old orders always point at a real product.
+- **Supplier products vs your own:** products created in the admin are marked `manual` and are never changed by a supplier sync. Products that came from a feed are refreshed by the sync, which replaces edits made to them in the admin.
+- **Images:** the product pop-up stores an image link. Upload your photo to an image host (or put it in `public/images/products/`) and paste the `https://…` link (or `/images/products/your-file.jpg`).
+- **Legal details** (company name, RC number, address, policies) appear only in the footer, never in the header.
 
 ---
 

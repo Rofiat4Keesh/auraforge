@@ -19,6 +19,7 @@ import {
   listAdminProducts,
   listCustomers,
   listOrders,
+  listTransactions,
   runSupplierSync,
   setProductActive,
   updateCategory,
@@ -56,7 +57,7 @@ export const getOrderController = handle(async (_req: NextRequest, ctx: Ctx<"ref
   return ok(await getOrderDetail(reference));
 });
 
-/** PATCH /api/admin/orders/:reference  { status: "FULFILLED" | "CANCELLED" | "PAID", restock?: boolean } */
+/** PATCH /api/admin/orders/:reference  { status: "PROCESSING" | "SHIPPED" | "DELIVERED" | "CANCELLED", restock?: boolean } */
 export const updateOrderController = handle(async (req: NextRequest, ctx: Ctx<"reference">) => {
   await requireAdmin();
   const { reference } = await ctx.params;
@@ -106,6 +107,24 @@ export const toggleProductController = handle(async (req: NextRequest, ctx: Ctx<
   const { id } = await ctx.params;
   const { active } = productActiveSchema.parse(await readJson(req));
   return ok(await setProductActive(id, active));
+});
+
+/** GET /api/admin/transactions?status=&q=&from=YYYY-MM-DD&to=YYYY-MM-DD&page= */
+export const listTransactionsController = handle(async (req: NextRequest) => {
+  await requireAdmin();
+  const dateParam = (key: string) => {
+    const value = req.nextUrl.searchParams.get(key);
+    return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : undefined;
+  };
+  return ok(
+    await listTransactions({
+      q: textParam(req, "q"),
+      status: textParam(req, "status"),
+      from: dateParam("from"),
+      to: dateParam("to"),
+      page: pageParam(req),
+    }),
+  );
 });
 
 /** GET /api/admin/categories */

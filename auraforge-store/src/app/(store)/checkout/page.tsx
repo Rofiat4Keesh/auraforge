@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 export default function CheckoutPage() {
   return (
     <div className="container-x py-10">
-      <p className="eyebrow">Step 1 of 2 · Delivery details</p>
+      <p className="eyebrow">Checkout</p>
       <h1 className="mb-8 mt-2 text-3xl font-bold">Secure checkout</h1>
       <CheckoutForm testMode={isTestMode()} />
     </div>

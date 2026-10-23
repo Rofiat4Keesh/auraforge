@@ -104,7 +104,15 @@ export interface OrderItemDTO {
   lineTotal: number;
 }
 
-export type OrderStatusDTO = "PENDING" | "PAID" | "FAILED" | "CANCELLED" | "FULFILLED";
+export type OrderStatusDTO =
+  | "PENDING"
+  | "PAID"
+  | "PROCESSING"
+  | "SHIPPED"
+  | "DELIVERED"
+  | "FAILED"
+  | "CANCELLED"
+  | "FULFILLED";
 
 export interface OrderDTO {
   reference: string;

@@ -53,7 +53,7 @@ async function main() {
         console.log(`✔ ${email} is now an admin, and the password was reset.`);
       } else {
         await prisma.user.update({ where: { email }, data: { role: "ADMIN" } });
-        console.log(`✔ ${email} is now an admin. Sign in at /admin with your usual password.`);
+        console.log(`✔ ${email} is now an admin. Sign in on the shop, then click “Admin Portal” in the header.`);
       }
       return;
     }
@@ -66,7 +66,7 @@ async function main() {
     await prisma.user.create({
       data: { email, fullName: name, role: "ADMIN", passwordHash: await bcrypt.hash(password, 12) },
     });
-    console.log(`✔ Admin account created for ${email}. Sign in at /admin.`);
+    console.log(`✔ Admin account created for ${email}. Sign in on the shop, then click “Admin Portal” in the header.`);
   } finally {
     await prisma.$disconnect();
   }

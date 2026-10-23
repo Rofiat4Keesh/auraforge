@@ -1,23 +1,40 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Loader2, Search } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
 import { formatMoney } from "@/lib/money";
 import type { AdminOrderRow, Paged } from "@/types/admin";
 import { EmptyRow, Pagination, StatusPill, TableShell, formatDateTime, td, th } from "./ui";
+import { Modal } from "./Modal";
+import { OrderDetailView } from "./OrderDetailView";
 
 const FILTERS = [
   { value: "", label: "All" },
-  { value: "PAID", label: "To ship" },
-  { value: "PENDING", label: "Awaiting payment" },
-  { value: "FULFILLED", label: "Fulfilled" },
+  { value: "PENDING", label: "Pending" },
+  { value: "PAID", label: "Paid · to pack" },
+  { value: "PROCESSING", label: "Processing" },
+  { value: "SHIPPED", label: "Shipped" },
+  { value: "DELIVERED", label: "Delivered" },
+  { value: "FULFILLED", label: "Fulfilled (older)" },
   { value: "FAILED", label: "Failed" },
   { value: "CANCELLED", label: "Cancelled" },
 ];
 
-export function OrdersTable({ initialStatus, initialQuery }: { initialStatus: string; initialQuery: string }) {
+/**
+ * Orders list with status filter chips and search. Clicking an order opens a pop-up with the
+ * shipping information, phone number, Paystack reference and a status selector.
+ * `/admin/orders?open=AF-XXXX` opens that order's pop-up straight away (used by the dashboard).
+ */
+export function OrdersTable({
+  initialStatus,
+  initialQuery,
+  initialOpen = "",
+}: {
+  initialStatus: string;
+  initialQuery: string;
+  initialOpen?: string;
+}) {
   const [status, setStatus] = useState(initialStatus);
   const [query, setQuery] = useState(initialQuery);
   const [debounced, setDebounced] = useState(initialQuery);
@@ -25,18 +42,30 @@ export function OrdersTable({ initialStatus, initialQuery }: { initialStatus: st
   const [data, setData] = useState<Paged<AdminOrderRow> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [openReference, setOpenReference] = useState(initialOpen);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(query.trim()), 350);
     return () => clearTimeout(t);
   }, [query]);
 
+  // Keep the address bar in step with the filters and the open pop-up, so the view can be bookmarked.
+  useEffect(() => {
+    const address = new URLSearchParams();
+    if (status) address.set("status", status);
+    if (debounced) address.set("q", debounced);
+    if (page > 1) address.set("page", String(page));
+    if (openReference) address.set("open", openReference);
+    const query = address.toString();
+    window.history.replaceState(null, "", query ? `/admin/orders?${query}` : "/admin/orders");
+  }, [status, debounced, page, openReference]);
+
   useEffect(() => {
     const params = new URLSearchParams();
     if (status) params.set("status", status);
     if (debounced) params.set("q", debounced);
     params.set("page", String(page));
-    window.history.replaceState(null, "", `/admin/orders?${params.toString().replace(/&?page=1$/, "")}`);
     const controller = new AbortController();
     setLoading(true);
     apiFetch<Paged<AdminOrderRow>>(`/api/admin/orders?${params}`, { signal: controller.signal, cache: "no-store" })
@@ -52,7 +81,10 @@ export function OrdersTable({ initialStatus, initialQuery }: { initialStatus: st
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [status, debounced, page]);
+  }, [status, debounced, page, reloadKey]);
+
+  const closeModal = useCallback(() => setOpenReference(""), []);
+  const refreshList = useCallback(() => setReloadKey((k) => k + 1), []);
 
   return (
     <div>
@@ -112,11 +144,19 @@ export function OrdersTable({ initialStatus, initialQuery }: { initialStatus: st
             <EmptyRow colSpan={6}>No orders match this view.</EmptyRow>
           ) : (
             data?.rows.map((o) => (
-              <tr key={o.reference} className="transition hover:bg-obsidian-850">
+              <tr key={o.reference} className="cursor-pointer transition hover:bg-obsidian-850" onClick={() => setOpenReference(o.reference)}>
                 <td className={td}>
-                  <Link href={`/admin/orders/${o.reference}`} className="font-mono text-neon-cyan hover:underline">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenReference(o.reference);
+                    }}
+                    className="font-mono text-neon-cyan hover:underline"
+                    aria-label={`Open order ${o.reference}`}
+                  >
                     {o.reference}
-                  </Link>
+                  </button>
                 </td>
                 <td className={td}>
                   <p className="text-ink-100">{o.customerName}</p>
@@ -141,6 +181,10 @@ export function OrdersTable({ initialStatus, initialQuery }: { initialStatus: st
           <Pagination page={data.page} totalPages={data.totalPages} onChange={setPage} />
         </div>
       )}
+
+      <Modal open={Boolean(openReference)} onClose={closeModal} labelledBy="order-detail-title" size="xl">
+        {openReference && <OrderDetailView key={openReference} reference={openReference} variant="modal" onUpdated={refreshList} />}
+      </Modal>
     </div>
   );
 }

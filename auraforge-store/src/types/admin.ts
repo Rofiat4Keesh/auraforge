@@ -3,6 +3,14 @@ import type { OrderDTO, OrderStatusDTO } from "@/types";
 /** Shapes used only by the admin portal. Money values are integers in kobo. */
 
 export interface AdminStats {
+  /** All-time paid revenue, in kobo */
+  totalRevenue: number;
+  totalPaidOrders: number;
+  /** Every order ever created, any status */
+  totalOrders: number;
+  /** Variants at or below the low-stock limit (including sold-out ones) */
+  lowStockCount: number;
+  outOfStockCount: number;
   revenueToday: number;
   revenue30d: number;
   paidOrders30d: number;
@@ -14,6 +22,8 @@ export interface AdminStats {
   dailyRevenue: { date: string; total: number; orders: number }[];
   lowStock: { id: string; name: string; sku: string; label: string; stock: number }[];
   recentOrders: AdminOrderRow[];
+  /** Latest paid orders, newest payment first */
+  recentSales: AdminOrderRow[];
 }
 
 export interface AdminOrderRow {
@@ -41,6 +51,8 @@ export interface AdminTransaction {
 
 export interface AdminOrderDetail extends OrderDTO {
   stockDeducted: boolean;
+  /** Statuses this order may be moved to next */
+  allowedTransitions: OrderStatusDTO[];
   account: { id: string; fullName: string; email: string } | null;
   transactions: AdminTransaction[];
 }
@@ -125,4 +137,35 @@ export interface AdminSyncResult {
   deactivated: number;
   skipped: { externalId: string; reason: string }[];
   finishedAt: string;
+}
+
+/** One row of the Admin → Transactions log (a Paystack payment attempt). */
+export interface AdminTransactionRow {
+  reference: string;
+  paystackId: string | null;
+  status: "INITIALIZED" | "SUCCESS" | "FAILED" | "ABANDONED";
+  amount: number;
+  currency: string;
+  channel: string | null;
+  gatewayResponse: string | null;
+  lastSource: string;
+  customerEmail: string;
+  customerName: string;
+  orderReference: string;
+  orderStatus: OrderStatusDTO;
+  paidAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminTransactionTotals {
+  /** Successful payments in this filtered view, in kobo */
+  successAmount: number;
+  successCount: number;
+  failedCount: number;
+  pendingCount: number;
+}
+
+export interface PagedTransactions extends Paged<AdminTransactionRow> {
+  totals: AdminTransactionTotals;
 }
