@@ -12,8 +12,8 @@
 #   SERVICE_USER_MONGO / SERVICE_PASSWORD_MONGO -> database username/password (random)
 #   SERVICE_PASSWORD_64_JWT        -> secret that signs sign-in cookies
 #   SERVICE_PASSWORD_64_MONGOKEY   -> replica-set key
-# Optional, in Coolify -> Environment Variables: PAYSTACK_PUBLIC_KEY, PAYSTACK_SECRET_KEY,
-# NEXT_PUBLIC_SUPPORT_EMAIL, NEXT_PUBLIC_SUPPORT_PHONE. Without Paystack keys the store takes
+# Set in Coolify -> Environment Variables: ADMIN_EMAIL and ADMIN_PASSWORD (your administrator, 10+ characters).
+# Optional: PAYSTACK_PUBLIC_KEY, PAYSTACK_SECRET_KEY, NEXT_PUBLIC_SUPPORT_EMAIL, NEXT_PUBLIC_SUPPORT_PHONE. Without Paystack keys the store takes
 # "pay later" orders that still appear in the Admin Portal.
 
 services:
@@ -38,6 +38,11 @@ services:
       - SUPPLIER_SOURCE=${SUPPLIER_SOURCE:-technocrat}
       - SUPPLIER_DEFAULT_STOCK=${SUPPLIER_DEFAULT_STOCK:-5}
       - COOKIE_DOMAIN=${COOKIE_DOMAIN:-}
+      # Your administrator (set both in Coolify -> Environment Variables, mark them as secret).
+      # Created automatically on start if it doesn't exist; no default/demo admin is ever created.
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      - ADMIN_NAME=${ADMIN_NAME:-Store Administrator}
     depends_on:
       mongo:
         condition: service_healthy

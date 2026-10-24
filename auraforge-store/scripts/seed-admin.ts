@@ -64,9 +64,8 @@ async function main() {
       if (password.length < 10) {
         throw new Error('Set ADMIN_PASSWORD in your .env file (at least 10 characters), e.g. ADMIN_PASSWORD="Choose-a-long-one-2026".');
       }
-      if (name.length < 2) throw new Error('Set ADMIN_NAME in your .env file, e.g. ADMIN_NAME="Ada Okafor".');
       await prisma.user.create({
-        data: { email, fullName: name, role: "ADMIN", passwordHash: await bcrypt.hash(password, 12) },
+        data: { email, fullName: name.length >= 2 ? name : "Store Administrator", role: "ADMIN", passwordHash: await bcrypt.hash(password, 12) },
       });
       console.log(`✔ Admin account created for ${email}.`);
     }

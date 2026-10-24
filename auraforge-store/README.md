@@ -293,7 +293,7 @@ The Docker files sit at the **top of the repository** (next to the `auraforge-st
 4. Save. Coolify shows the `app` and `mongo` services. Under **app → Domains**, keep the generated domain or enter your own (e.g. `https://shop.yourdomain.ng`). The Admin Portal is the same domain + `/admin`.
 5. Optional **Environment Variables**: `PAYSTACK_PUBLIC_KEY`, `PAYSTACK_SECRET_KEY`, `NEXT_PUBLIC_SUPPORT_EMAIL`, `NEXT_PUBLIC_SUPPORT_PHONE`. Everything else is generated (`SERVICE_*`).
 6. **Deploy.** The first build takes about 5–8 minutes. Then open `https://<your-domain>/api/health` — it should say `{"status":"ok","database":"connected"}`.
-7. Create your own admin: **app → Terminal** → `npx tsx scripts/seed-admin.ts --email you@yourdomain.ng --password "A-long-password" --name "Your Name"`.
+7. **Your administrator:** before deploying, add `ADMIN_EMAIL` and `ADMIN_PASSWORD` (10+ characters, tick **Is Secret**) under Environment Variables. On start the server creates that admin if it doesn't exist. No demo or default admin is ever created on a live server.
 
 **Option B — Dockerfile build pack (app only)**
 
@@ -623,7 +623,7 @@ npm run admin:create -- --email someone@yourdomain.ng
 npm run admin:create -- --email someone@yourdomain.ng --revoke
 ```
 
-(The `--` passes the rest of the line to the script.) After `npm run setup` there is also a demo admin: `admin@auraforge.test` / `Admin12345!`. **Remove or revoke it before going live.**
+(The `--` passes the rest of the line to the script.) Demo logins (`admin@auraforge.test` / `Admin12345!`, `demo@auraforge.test` / `Demo12345!`) are created **only** when `SEED_DEMO_ACCOUNTS="true"` is in your `.env` — use that on your own computer, never on a live server. On a server, set `ADMIN_EMAIL` and `ADMIN_PASSWORD` as secret variables and your administrator is created automatically on start.
 
 ### 13.3 Who can open `/admin`
 

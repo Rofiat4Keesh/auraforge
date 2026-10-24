@@ -23,6 +23,15 @@ async function main() {
     `✔ Catalog from "${report.source}": ${report.categories} categories, ${report.created} products created, ${report.updated} updated.`,
   );
 
+  // Demo accounts (known passwords) are for local testing ONLY. They are created only when
+  // SEED_DEMO_ACCOUNTS="true", so a production database never gets a publicly known admin login.
+  // Real admins are created from ADMIN_EMAIL / ADMIN_PASSWORD (see scripts/seed-if-empty.ts)
+  // or with `npm run seed:admin`.
+  if (process.env.SEED_DEMO_ACCOUNTS !== "true") {
+    console.log("✔ Demo accounts skipped (set SEED_DEMO_ACCOUNTS=\"true\" only on your own computer to create them).");
+    return;
+  }
+
   const demoEmail = "demo@auraforge.test";
   const passwordHash = await bcrypt.hash("Demo12345!", 10);
   await prisma.user.upsert({
@@ -32,8 +41,6 @@ async function main() {
   });
   console.log(`✔ Demo login → email: ${demoEmail}  password: Demo12345!`);
 
-  // Demo admin so you can try the admin portal at /admin straight away.
-  // Delete it (or change its password) before going live: npm run admin:create -- --email ... --revoke
   const adminEmail = "admin@auraforge.test";
   await prisma.user.upsert({
     where: { email: adminEmail },
@@ -45,7 +52,7 @@ async function main() {
     },
     update: { role: "ADMIN" },
   });
-  console.log(`✔ Demo ADMIN → email: ${adminEmail}  password: Admin12345!  (open /admin)`);
+  console.log(`✔ Demo ADMIN → email: ${adminEmail}  password: Admin12345!  (local testing only)`);
 }
 
 main()
